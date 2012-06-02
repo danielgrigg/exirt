@@ -1,155 +1,99 @@
 (ns cexirt.core
   (:gen-class)
-  (:require [incanter [core :as icc]]) 
-  (:require [clojure.math.numeric-tower :as math]))
-
-;; Note we use defrecord liberally to ease development, though at 'some point',
-;; many should be replaced with deftypes.
-
- (set! *warn-on-reflection* true)
-; (set! *unchecked-math* true)
-
-(def ^:const pi 3.141592653589793)
-(def ^:const epsilon 4e-5)
-(def ^:const infinity 1e37)
-
-(defmacro bench [n & exprs]
-  `(time
-   (dotimes [~'_ ~n]
-     (do ~@exprs))))
-
-(defmacro jna-call [lib func ret & args] 
-  `(let [library#  (name ~lib)
-           function# (com.sun.jna.Function/getFunction library# ~func)] 
-           (.invoke function# ~ret (to-array [~@args]))))
-
-; well, type-hinting the parameters doubled throughput..kinda crazy
-; can coerce the expressions to double to improve ~3% but it's fugly.
-(defn quadratic [^double A ^double B ^double C]
-  (let [discrim (- (* B B) (* 4.0 A C))]
-    (if (< discrim 0)
-      nil
-      (let [rootDiscrim (math/sqrt discrim)
-            q (if (< B 0)
-                (* -0.5 (- B rootDiscrim))
-                (* -0.5 (+ B rootDiscrim)))
-            t0 (/ q A)
-            t1 (/ C q)]
-        (if (> t0 t1)
-          [t1 t0]
-          [t0 t1])))))
-        
-
-; VECTOR OPS
-(deftype vec3 [x y z])
-
-;; (defn dot [a b] (icc/sum (icc/mult a b)))
-      
-(defn dot [a b]
-  (+ (* (a 0) (b 0)) (* (a 1) (b 1)) (* (a 2) (b 2))))
-
-(defn my-sq [a]
-  (* a a))
-
-(defn cross [u v]
-  (let [a #^vec3 (apply ->vec3 u)
-        b #^vec3 (apply ->vec3 v)]
-    (icc/matrix [(- (* (.y a) (.z b)) (* (.z a) (.y b)))
-             (- (* (.z a) (.x b)) (* (.x a) (.z b)))
-             (- (* (.x a) (.y b)) (* (.y a) (.x b)))])))
-
-(deftype Ray [origin direction mint maxt])
-
-(defn new-ray [origin direction]
-  (Ray. origin direction epsilon infinity))
-
-(defprotocol RayIntersections
-  "Ray to shape intersection methods"
-;;  (intersect [shape  r] "compute the intersection")
-  (intersectP [shape  r] "test intersection exists"))
-
-; centre only exists until transforms are supported.
-(deftype Sphere [radius])
-
-;;         RayIntersections
-         (defn intersect [^Sphere shape ^Ray ray] ; {:hit false :t 99.9})
-           (let [A (dot (.direction ray) (.direction ray))
-                 B (* 2.0 (dot (.direction ray) (.origin ray)))
-                 C (- (dot (.origin ray) (.origin ray)) (my-sq (.radius shape) ))]
-             (if-let [t (quadratic A B C)]
-               (let [t0 (first t)
-                     t1 (second t)]
-                 (if-not (or (> t0 (.maxt ray)) (< t1 (.mint ray)))
-                   (if (< t0 (.mint ray))
-                     [ (> (.maxt ray) t1) t1]
-                     [ true t0]))))))
-                 
- ;;        (intersectP [shape r ] false))
-
-
- 
-(defn new-sphere [r] (Sphere. r))
-
-(defn squash-twice [coll]
-  (mapcat identity (mapcat identity coll)))
-
-(defn noise-framebuffer [w h]
-      (repeatedly (* w h) #(vector (rand) (rand) (rand) 1.0)))
+  ;;  (:require [incanter [core :as icc]])
+  (:use cexirt.essentials)
+  (:use cexirt.geom)
+  (:use cexirt.limath)
+  (:use [clojure.pprint :only [pprint]]))
 
 (defn native-framebuffer [fb]
-;;      (float-array (mapcat identity fb)))
-        (float-array (reduce #(apply conj % %2) [] fb)))
+  (float-array (apply concat fb)))
 
-(defn write-noisy [w h]
-  (jna-call :exr_basic "write_rgba" Integer w h
-            (native-framebuffer
-             (noise-framebuffer w h))))
+(defn finish-framebuffer [width height fb]
+    (jna-call :exr_basic "write_rgba" Integer width height
+              (native-framebuffer fb)))
 
-(defn mtest []
-  (let [s (new-sphere 200)
-        r (range -300 300 1)
-        l (count r)]
-    (jna-call :exr_basic "write_rgba" Integer l l
-              (native-framebuffer 
-                (map #(if (first %) [1 1 0 1] [0 0 0 1])
-                     (for [x r y r]
-                          (intersect s (new-ray [x y 4] [0 0 -1]))))))))
+;; NDC to screen coordinates
+(defn screen-transform [w h]
+  (compose (translate 0 h 0) (scale w (- h) 1) (scale 0.5 0.5 1.0) (translate 1 1 0)))
 
-(defn mtest2 []
- (let [s (new-sphere 100)
-       r (range -200 200 1)
-       l (count r)]
-   (doall
-        (for [x r y r]
-          (intersect s (new-ray [x y 4] [0 0 -1]))))))
- 
-(defn mtest3 []
- (let [s (new-sphere 200)
-        r (range -300 300 1)
-       l (count r)]
-   (dotimes [n (* 300 300)]
-   
-     (intersect s (new-ray [0 0 4] [0 0 -1])))))
+(defn new-camera-ray [x y screen-to-camera]
+  (new-ray (point3 0 0 0)
+       (vsub4 (transform-point (point3 x y -1) (inverse screen-to-camera))
+              (point3 0 0 0))))
 
+(defn camera-rays [width height proj]
+  (let [S (screen-transform width height)
+        SP (compose S proj)]
+    (for [y (range 0 height)
+          x (range 0 width)]
+      (new-camera-ray x y SP))))
+                  
+(defn test-screen-coverage [width height]
+  (finish-framebuffer
+   width height
+   (map (fn [[r g]] [r g 0.0 1.0]) 
+        (map
+         (fn [r] (let [d (.direction r)] (vnormalize4 [(d 0) (d 1) 0.5 0.0])))
+         (camera-rays width height (perspective (Math/toRadians 38.) 1.0 1.0 100.))))))
 
-(defn mtest4 []
-  (for [n (range (* 600 600))]
-    (let [^Sphere s (new-sphere 200)
-          ^Ray ray (new-ray [0 0 4] [0 0 -1])
-          A (dot (.direction ray) (.direction ray))
-          B (* 2.0 (dot (.direction ray) (.origin ray)))
-          C (- (dot (.origin ray) (.origin ray)) (my-sq (.radius s)))]
+(def ^:dynamic *world* (new-sphere 2.0))
+(def ^:dynamic *world-transform* (translate 0 0 -6))
+(def ^:const background [0.0 0.0 0.0 1.0])
+(def ^:const default-perspective (perspective (Math/toRadians 38.) 1.0 1.0 100.))
 
-        (quadratic A B C))))
+(defn trace-world [ray]
+  (let [r-world (transform ray (inverse *world-transform*))]
+    (if-let [hit (intersect *world* r-world)]
+      (ray-at r-world (second hit)))))
 
-(comment (time (reduce + 0 (map first (mtest4)))))
-     
+(defn shade-diffuse [p]
+  (if p
+    (let [l (max 0.0 
+                 (vdot4 (vnormalize4 (vsub4 p (point3 0 0 0))) 
+                        (vector3 1 1 1)))]
+      [l l l 1.0])
+    background))
+
+(defn sphere-trace [width height fov process-fn]
+  (let [P (perspective (Math/toRadians fov) 1.0 1.0 100.)]        
+    (map process-fn
+         (map trace-world
+              (camera-rays width height (perspective (Math/toRadians fov) 1. 1. 100.))))))
+
+(defn dither [c]
+  (let [dk 0.0001
+        n4 (vmul4s (vec (concat (rand-gauss2) (rand-gauss2))) dk)]
+    (vadd4 c n4)))
+
+(defn new-rgba [rgb a]
+  [(rgb 0) (rgb 1) (rgb 2) a])
+
+(defn shade-point [p]
+  (if p p background))
+
+(defn shade-normal [p]
+  (if p
+    (let [rgb (xyz (vadd4s (vmul4s (vnormalize4 (vsub4 p (point3 0 0 0))) 0.5) 0.5))]
+      [(Math/pow (rgb 0) 2.22)
+       (Math/pow (rgb 1) 2.22)
+       (Math/pow (rgb 2) 2.22)
+       1.])
+    background))
+
 (defn -main [& args]
-      (println "Running mtest")
-      (mtest)
-;;      (time (reduce + 0 (map first (mtest4))))
-;;      (bench 1 (mtest2))
-      (println "Done."))
+  (let [[w h fov r] (map read-string (take 4 args))]
+    (println "Running cexirt with "
+             (/ (.maxMemory (java.lang.Runtime/getRuntime)) 1024.0 1024.0) " MB memory")
+    (println "w " w " h " h " fov " fov " r " r)
+;;    (test-screen-coverage)
+    (binding [*world* (new-sphere r)]
+      (finish-framebuffer
+       w h
+       (map dither
+            (sphere-trace w h fov shade-diffuse))))))
 
- ;;   (println (apply str (interpose "\n" (map #(apply str %) M))))))
 
+(defn stratify1 [w]
+  (let [inv-w (double (/ w))]
+    (for [x (range w)] (* (+ x (rand)) inv-w))))

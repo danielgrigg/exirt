@@ -1,16 +1,46 @@
-(ns limath.core
-  (:gen-class)
+(ns cexirt.limath
   (:require [clojure.math.numeric-tower :as math])
+  (:use cexirt.essentials)
   (:use [clojure.pprint :only [pprint]]))
 
-(set! *warn-on-reflection* true)
+; (set! *unchecked-math* true)
 
-(defmacro bench "Time n iterations of exprs" [n & exprs]
-  `(time
-    (dotimes [~'_ ~n]
-      (do ~@exprs))))
+(def ^:const pi Math/PI)
+(def ^:const eps 4e-5)
+(def ^:const infinity 1e37)
 
-(defmacro str-sym "Symbolise a sequence of tokens" [& args] `(symbol (str ~@args)))
+(defn sq [^double x] (* x x))
+
+(defn equal-scalar
+  ([^double x ^double y]
+     (< (Math/abs (- x y)) eps))
+  ([^double x ^double y ^double tolerance]
+     (< (Math/abs (- x y)) tolerance)))
+
+(defn rand-gauss []
+  (let [u (rand)
+        v (rand)]
+    (* (Math/sqrt (* -2.0 (Math/log u))) (Math/cos (* 2.0 pi v)))))
+
+(defn rand-gauss2 []
+  (let [u (rand)
+        v (rand)]
+    [(* (Math/sqrt (* -2.0 (Math/log u))) (Math/cos (* 2.0 pi v)))
+     (* (Math/sqrt (* -2.0 (Math/log u))) (Math/sin (* 2.0 pi v)))]))
+
+(defn quadratic [^double A ^double B ^double C]
+  (let [discrim (- (* B B) (* 4.0 A C))]
+    (if (< discrim 0)
+      nil
+      (let [rootDiscrim (math/sqrt discrim)
+            q (if (< B 0)
+                (* -0.5 (- B rootDiscrim))
+                (* -0.5 (+ B rootDiscrim)))
+            t0 (/ q A)
+            t1 (/ C q)]
+        (if (> t0 t1)
+          [t1 t0]
+          [t0 t1])))))
 
 (defmacro vec-op [op n & args]
   `[~@(for [x (range n)]
@@ -54,22 +84,14 @@
 (make-vec-ops sub "Subtract" - false)
 (make-vec-ops mul "Multiply" * false)
 (make-vec-ops div "Divide" / false)
-(make-vec-reduce-ops "Dot product" dot + * false)
-(make-vec-reduce-ops "Length^2" length-sq + * true)
-(make-vec-scalar-ops "Add" add +)
-(make-vec-scalar-ops "Subtract" sub -)
-(make-vec-scalar-ops "Multiply" mul *)
-(make-vec-scalar-ops "Divide" div /)
+(make-vec-reduce-ops dot "Dot product" + * false)
+(make-vec-reduce-ops length-sq "Length^2" + * true)
+(make-vec-scalar-ops add "Add" +)
+(make-vec-scalar-ops sub "Subtract" -)
+(make-vec-scalar-ops mul "Multiply" *)
+(make-vec-scalar-ops div "Divide" /)
+(make-vec-reduce-ops equal "Equality" and equal-scalar false)
 
-;;(defmacro make-vec-op-header [name arg1 & exprs]
-;;    (cons `do
-;;        (for [n [2 3 4]]
-;;          `(defn ~(str-sym \v name)
-;;            ~(str name " of " n "-vector")
-;;             []
-;;             ~@exprs))))
-
-;; Idea here is to macro out the boilerplate... but how do we 'unroll' the exprs?
 (defmacro make-vec-length []
   (cons `do
         (for [n [2 3 4]]
@@ -87,6 +109,8 @@
   [(- (* (a 1) (b 2)) (* (a 2) (b 1)))
    (- (* (a 2) (b 0)) (* (a 0) (b 2)))
    (- (* (a 0) (b 1)) (* (a 1) (b 0)))])
+
+(defn xyz [v] [(v 0) (v 1) (v 2)])
 
 ;; MATRIX OPERATIONS
 ;; Genereate per-element matrix functions
@@ -110,15 +134,18 @@
 (defmacro make-mmul []
   (cons 'do
         (for [n [2 3 4]]
-          `(defn ~(str-sym "mmul" n) ~(str "Multiply two " n "x" n " matrices")
-             [~'A ~'B]
-             (let [~@(apply concat
-                            `(~@(for [c (range n)]
-                                  `[~(str-sym \c c)
-                                    (~(str-sym "mcol" n) ~'B ~c) ])))]
-               [~@(for [x (range n)]
-                    (vec (for [y (range n)]
-                           `(~(str-sym "vdot" n) (~'A ~x) ~(str-sym \c y)))))])))))
+          (let [mmul# (str-sym "mmul" n)]
+          `(defn ~mmul#  ~(str "Multiply two " n "x" n " matrices")
+             ([~'A ~'B]
+                (let [~@(apply concat
+                               `(~@(for [c (range n)]
+                                     `[~(str-sym "c" c)
+                                       (~(str-sym "mcol" n) ~'B ~c) ])))]
+                  [~@(for [x (range n)]
+                       (vec (for [y (range n)]
+                              `(~(str-sym "vdot" n) (~'A ~x) ~(str-sym "c" y)))))]))
+             ([~'A ~'B & ~'xs]
+                (reduce ~mmul# (~mmul# ~'A ~'B) ~'xs)))))))
 
 (make-matrix-ops add "Add")
 (make-matrix-ops sub "Subtract")
@@ -204,37 +231,58 @@
 
         B [[(- (+ (* (t 0) (m11 M)) (* (t 3) (m12 M)) (* (t 4) (m13 M)))
                (+ (* (t 1) (m11 M)) (* (t 2) (m12 M)) (* (t 5) (m13 M))))         
-            (- (+ (* (t 1) (m10 M)) (* (t 6) (m12 M)) (* (t 9) (m13 M)))
+            (- (+ (* (t 1) (m01 M)) (* (t 2) (m02 M)) (* (t 5) (m03 M)))
+               (+ (* (t 0) (m01 M)) (* (t 3) (m02 M)) (* (t 4) (m03 M))))
+            (- (+ (* (t 12) (m31 M)) (* (t 15) (m32 M)) (* (t 16) (m33 M)))
+               (+ (* (t 13) (m31 M)) (* (t 14) (m32 M)) (* (t 17) (m33 M))))
+            (- (+ (* (t 14) (m22 M)) (* (t 17) (m23 M)) (* (t 13) (m21 M)))
+               (+ (* (t 16) (m23 M)) (* (t 12) (m21 M)) (* (t 15) (m22 M))))]
+
+           [(- (+ (* (t 1) (m10 M)) (* (t 6) (m12 M)) (* (t 9) (m13 M)))
                (+ (* (t 0) (m10 M)) (* (t 7) (m12 M)) (* (t 8) (m13 M))))          
-            (- (+ (* (t 2) (m10 M)) (* (t 7) (m11 M)) (* (t 10) (m13 M)))
-               (+ (* (t 3) (m10 M)) (* (t 6) (m11 M)) (* (t 11) (m13 M))))          
-            (- (+ (* (t 5) (m10 M)) (* (t 8) (m11 M)) (* (t 11) (m12 M)))
-               (+ (* (t 4) (m10 M)) (* (t 9) (m11 M)) (* (t 10) (m12 M))))]
-           
-           [(- (+ (* (t 1) (m01 M)) (* (t 2) (m02 M)) (* (t 5) (m03 M)))
-               (+ (* (t 0) (m01 M)) (* (t 3) (m02 M)) (* (t 4) (m03 M))))          
             (- (+ (* (t 0) (m00 M)) (* (t 7) (m02 M)) (* (t 8) (m03 M)))
                (+ (* (t 1) (m00 M)) (* (t 6) (m02 M)) (* (t 9) (m03 M))))          
-            (- (+ (* (t 3) (m00 M)) (* (t 6) (m01 M)) (* (t 11) (m03 M)))
-               (+ (* (t 2) (m00 M)) (* (t 7) (m01 M)) (* (t 10) (m03 M))))          
-            (- (+ (* (t 4) (m00 M)) (* (t 9) (m01 M)) (* (t 10) (m02 M)))
-               (+ (* (t 5) (m00 M)) (* (t 8) (m01 M)) (* (t 11)(m02 M))))]
-           
-           [(- (+ (* (t 12) (m31 M)) (* (t 15) (m32 M)) (* (t 16) (m33 M)))
-               (+ (* (t 13) (m31 M)) (* (t 14) (m32 M)) (* (t 17) (m33 M))))            
             (- (+ (* (t 13) (m30 M)) (* (t 18) (m32 M)) (* (t 21) (m33 M)))
                (+ (* (t 12) (m30 M)) (* (t 19) (m32 M)) (* (t 20) (m33 M))))            
+            (- (+ (* (t 20) (m23 M)) (* (t 12) (m20 M)) (* (t 19) (m22 M)))
+               (+ (* (t 18) (m22 M)) (* (t 21) (m23 M)) (* (t 13) (m20 M))))]
+
+           [(- (+ (* (t 2) (m10 M)) (* (t 7) (m11 M)) (* (t 10) (m13 M)))
+               (+ (* (t 3) (m10 M)) (* (t 6) (m11 M)) (* (t 11) (m13 M))))          
+            (- (+ (* (t 3) (m00 M)) (* (t 6) (m01 M)) (* (t 11) (m03 M)))
+               (+ (* (t 2) (m00 M)) (* (t 7) (m01 M)) (* (t 10) (m03 M))))          
             (- (+ (* (t 14) (m30 M)) (* (t 19) (m31 M)) (* (t 22) (m33 M)))
                (+ (* (t 15) (m30 M)) (* (t 18) (m31 M)) (* (t 23) (m33 M))))            
-            (- (+ (* (t 17) (m30 M)) (* (t 20) (m31 M)) (* (t 23) (m32 M)))
-               (+ (* (t 16) (m30 M)) (* (t 21) (m31 M)) (* (t 22) (m32 M))))]
-           
-           [(- (+ (* (t 14) (m22 M)) (* (t 17) (m23 M)) (* (t 13) (m21 M)))
-               (+ (* (t 16) (m23 M)) (* (t 12) (m21 M)) (* (t 15) (m22 M))))
-            (- (+ (* (t 20) (m23 M)) (* (t 12) (m20 M)) (* (t 19) (m22 M)))
-               (+ (* (t 18) (m22 M)) (* (t 21) (m23 M)) (* (t 13) (m20 M))))            
+
             (- (+ (* (t 18) (m21 M)) (* (t 23) (m23 M)) (* (t 15) (m20 M)))
                (+ (* (t 22) (m23 M)) (* (t 14) (m20 M)) (* (t 19) (m21 M))))            
+            ]
+
+           [(- (+ (* (t 5) (m10 M)) (* (t 8) (m11 M)) (* (t 11) (m12 M)))
+               (+ (* (t 4) (m10 M)) (* (t 9) (m11 M)) (* (t 10) (m12 M))))
+            (- (+ (* (t 4) (m00 M)) (* (t 9) (m01 M)) (* (t 10) (m02 M)))
+               (+ (* (t 5) (m00 M)) (* (t 8) (m01 M)) (* (t 11)(m02 M))))
+            (- (+ (* (t 17) (m30 M)) (* (t 20) (m31 M)) (* (t 23) (m32 M)))
+               (+ (* (t 16) (m30 M)) (* (t 21) (m31 M)) (* (t 22) (m32 M))))
             (- (+ (* (t 22) (m22 M)) (* (t 16) (m20 M)) (* (t 21) (m21 M)))
                (+ (* (t 20) (m21 M)) (* (t 23) (m22 M)) (* (t 17) (m20 M))))]]]
-    (mmul4s B (/ (double (vdot4 (mrow M 0) (mrow B 0)))))))
+    (mmul4s B (/ (double (vdot4 (mrow M 0) (mcol4 B 0)))))))
+
+(defn midentity2 [] [[1 0] [0 1]])
+(defn midentity3 [] [[1 0 0] [0 1 0] [0 0 1]])
+(defn midentity4 [] [[1 0 0 0] [0 1 0 0] [0 0 1 0] [0 0 0 1]])
+
+(defmacro make-matrix-generator [f is-fn]
+  (cons `do
+        (for [n [2 3 4]]
+          `(defn ~(str-sym "m" f n)
+             ~(str "Generate " n "x" n " matrix with entries generated by f")
+             []
+             [~@(for [r (range n)]
+                  `[~@(for [c (range n)] (if is-fn `(~f) f) )])]))))
+
+(make-matrix-generator rand true)
+
+(defn mequal2 [A B] (every? true? (map vequal2 A B)))
+(defn mequal3 [A B] (every? true? (map vequal3 A B)))
+(defn mequal4 [A B] (every? true? (map vequal4 A B)))
