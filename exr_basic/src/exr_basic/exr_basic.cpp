@@ -1,7 +1,7 @@
 #include "exr_basic.h"
 #include <stdio.h>
 #include <vector>
-#include <OpenEXR/ImfRgbaFile.h>
+#include <ImfRgbaFile.h>
 
 //#include <OpenEXR/ImfOutputFile.h>
 //#include <OpenEXR/ImfInputFile.h>

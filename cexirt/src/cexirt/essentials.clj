@@ -13,3 +13,5 @@
            (.invoke function# ~ret (to-array [~@args]))))
 
 (defmacro str-sym "Symbolise a sequence of tokens" [& args] `(symbol (str ~@args)))
+
+(defmacro clamp [x a b] `(min ~b (max ~x ~a)))

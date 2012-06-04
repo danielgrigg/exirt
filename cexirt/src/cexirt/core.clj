@@ -4,31 +4,11 @@
   (:use cexirt.essentials)
   (:use cexirt.geom)
   (:use cexirt.limath)
+  (:use cexirt.film)
+  (:use cexirt.camera)
+  (:require cexirt.forge)
   (:use [clojure.pprint :only [pprint]]))
-
-(defn native-framebuffer [fb]
-  (float-array (apply concat fb)))
-
-(defn finish-framebuffer [width height fb]
-    (jna-call :exr_basic "write_rgba" Integer width height
-              (native-framebuffer fb)))
-
-;; NDC to screen coordinates
-(defn screen-transform [w h]
-  (compose (translate 0 h 0) (scale w (- h) 1) (scale 0.5 0.5 1.0) (translate 1 1 0)))
-
-(defn new-camera-ray [x y screen-to-camera]
-  (new-ray (point3 0 0 0)
-       (vsub4 (transform-point (point3 x y -1) (inverse screen-to-camera))
-              (point3 0 0 0))))
-
-(defn camera-rays [width height proj]
-  (let [S (screen-transform width height)
-        SP (compose S proj)]
-    (for [y (range 0 height)
-          x (range 0 width)]
-      (new-camera-ray x y SP))))
-                  
+                
 (defn test-screen-coverage [width height]
   (finish-framebuffer
    width height
@@ -61,11 +41,6 @@
          (map trace-world
               (camera-rays width height (perspective (Math/toRadians fov) 1. 1. 100.))))))
 
-(defn dither [c]
-  (let [dk 0.0001
-        n4 (vmul4s (vec (concat (rand-gauss2) (rand-gauss2))) dk)]
-    (vadd4 c n4)))
-
 (defn new-rgba [rgb a]
   [(rgb 0) (rgb 1) (rgb 2) a])
 
@@ -86,14 +61,14 @@
     (println "Running cexirt with "
              (/ (.maxMemory (java.lang.Runtime/getRuntime)) 1024.0 1024.0) " MB memory")
     (println "w " w " h " h " fov " fov " r " r)
-;;    (test-screen-coverage)
-    (binding [*world* (new-sphere r)]
+    ;;    (test-screen-coverage)
+    
+    (let [f (cexirt.forge/make-sin-clamped-f)]
+      (finish-framebuffer w h (cexirt.forge/graph2 w h f)))
+    
+    (comment (binding [*world* (new-sphere r)]
       (finish-framebuffer
        w h
        (map dither
-            (sphere-trace w h fov shade-diffuse))))))
+            (sphere-trace w h fov shade-diffuse)))))))
 
-
-(defn stratify1 [w]
-  (let [inv-w (double (/ w))]
-    (for [x (range w)] (* (+ x (rand)) inv-w))))
