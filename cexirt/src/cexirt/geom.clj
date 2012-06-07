@@ -4,36 +4,75 @@
   (:use [clojure.pprint :only [pprint]])
   (:require clojure.string))
 
-(defprotocol Transformable
-  (transform [this T]))
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
+(definterface Bounding
+  (^double width [])
+  (^double height [])
+  (^double depth []))
+
+(deftype BoundingBox2 [^double x0 ^double y0 ^double x1 ^double y1]
+  Bounding
+  (width [this]
+    (- x1 x0))
+  (height [ this]
+    (- y1 y0))
+  (depth [this] 0.0)
+
+  Object
+  (toString [this]
+   (str "(" x0 " " y0 ") (" x1 " " y1 ")")))
+
+(defn clip-bounding-box2 [^BoundingBox2 this ^BoundingBox2 other]
+    (BoundingBox2. (max (.x0 this) (.x0 other))
+                   (max (.y0 this) (.y0 other))
+                   (min (.x1 this) (.x1 other))
+                   (min (.y1 this) (.y1 other))))
+
+
+(defn bounding-box2-width-height [^double x ^double y ^double width ^double height]
+  (BoundingBox2. x y (+ x width) (+ y height)))
+
+(defn bounding-box2 [^double x0 ^double y0 ^double x1 ^double y1]
+  (BoundingBox2. x0 y0 x1 y1))
+
 
 (deftype Transform [transform inverse]
-  Transformable
-  (transform [this T]
-    (Transform. (mmul4 (.transform this) (.transform T))
-                (mmul4 (.inverse T) (.inverse this))))
-    
   Object
   (toString [this]
     (str "\n" (clojure.string/join "\n" (.transform this)) "\n")))
+
+;;(definterface Transformable
+;;  (^Transform transform-object [^Transform T]))
+
+(defprotocol Transformable
+  (transform-object [this T]))
+
+;;(extend-type Transform
+;;  Transformable
+;;  (transform [this T]
+;;    (Transform. (mmul4 (.transform this) (.transform T))
+;;                (mmul4 (.inverse T) (.inverse this)))))
+    
 
 ;; Assume Transform constructor is private
 (defn equal-transform [^Transform A ^Transform B]
   (mequal4 (.transform A) (.transform B)))
 
-(defn inverse [^Transform T]
+(defn ^Transform inverse [^Transform T]
   (Transform. (.inverse T) (.transform T)))
 
-(defn matrix-transform [M]
+(defn ^Transform matrix-transform [M]
   (Transform. M (minverse4 M)))
 
-(defn identity-transform []
+(defn ^Transform identity-transform []
   (matrix-transform (midentity4)))
 
 (defmacro compose [& xs]
   `(matrix-transform (mmul4 ~@(for [x xs] `(.transform ~x)))))
 
-(defn translate [^double tx ^double ty ^double tz]
+(defn ^Transform translate [^double tx ^double ty ^double tz]
   (Transform. [[1. 0. 0. tx]
                [0. 1. 0. ty]
                [0. 0. 1. tz]
@@ -43,7 +82,7 @@
                [0. 0. 1. (- tz)]
                [0. 0. 0. 1.]]))
 
-(defn scale [^double sx ^double sy ^double sz]
+(defn ^Transform scale [^double sx ^double sy ^double sz]
   (Transform. [[sx 0. 0. 0.]
                [0. sy 0. 0.]
                [0. 0. sz 0.]
@@ -53,7 +92,7 @@
                [0. 0. (/ sz) 0.]
                [0. 0. 0. 1.]]))
   
-(defn rotate-x [^double rads]
+(defn ^Transform rotate-x [^double rads]
   (let [c (Math/cos rads)
         s (Math/sin rads)
         M [[1. 0. 0. 0.]
@@ -62,7 +101,7 @@
            [0. 0. 0. 1.]]]
         (Transform. M (mtranspose4 M))))
 
-(defn rotate-y [^double rads]
+(defn ^Transform rotate-y [^double rads]
   (let [c (Math/cos rads)
         s (Math/sin rads)
         M [[c 0. s 0.]
@@ -80,7 +119,7 @@
            [0. 0. 0. 1.]]]
     (Transform. M (mtranspose4 M))))
 
-(defn rotate-axis [^double rads axis]
+(defn ^Transform rotate-axis [^double rads axis]
   (let [c (Math/cos rads)
         s (Math/sin rads)
         n (vnormalize3 axis)
@@ -102,14 +141,14 @@
            [0. 0. 0. 1.]]]
     (Transform. M (mtranspose4 M))))
 
-(defn ortho [l r b t n f]
+(defn ^Transform ortho [l r b t n f]
   (let [M [[(/ 2. (- r l)) 0. 0. (- (/ (+ r l) (- r l)))]
            [0. (/ 2. (- t b)) 0. (- (/ (+ t b) (- t b)))]
            [0. 0. (/ 2. (- f n)) (- (/ (+ f n) (- f n)))]
            [0. 0. 0. 1.]]]
     (Transform. M (mtranspose4 M)))) 
 
-(defn perspective [^double fov_rads ^double aspect ^double n ^double f]
+(defn ^Transform perspective [^double fov_rads ^double aspect ^double n ^double f]
   (let [t (* n (Math/tan (* fov_rads 0.5)))
         b (- t)
         l (* b aspect)
@@ -139,13 +178,12 @@
     p
     (vmul4s p (/ (p 3)))))
 
-(defn angle-of-view [^double plane-width ^double plane-distance]
+(defn ^double angle-of-view [^double plane-width ^double plane-distance]
   (* 2.0 (Math/atan (/ plane-width (* 2.0 plane-distance)))))
 
 (deftype Ray [origin direction ^double mint ^double maxt]
-  
   Transformable
-  (transform [this T]
+  (transform-object [this T]
     (Ray. (transform-point (.origin this) T)
           (transform-vector (.direction this) T)
           mint
@@ -162,35 +200,37 @@
 (defn ray-at [^Ray r ^double t]
   (vadd4 (.origin r) (vmul4s (.direction r) t)))
 
-(defn new-ray
+(defn ^Ray new-ray
   ([origin direction]
      (Ray. origin direction eps infinity))
   ([origin direction mint maxt]
      (Ray. origin direction mint maxt)))
 
+;; "Ray to shape intersection methods"
 (defprotocol RayIntersections
-  "Ray to shape intersection methods"
-  (intersect [shape r] "compute the intersection")
- ;; (intersectP [shape  r] "test intersection exists")
+  
+  ( intersect [this r]);; "compute the intersection")
+ ;; (intersectP [^Ray r] "test intersection exists")
   )
 
-(defrecord Sphere [radius]
+(deftype Sphere [^double radius]
   RayIntersections
-  (intersect [shape r]
-    (let [A (vdot3 (.direction r) (.direction r))
-          B (* 2.0 (vdot3 (.direction r) (.origin r)))
-          C (- (vdot3 (.origin r) (.origin r)) (sq (.radius shape) ))]
+  (intersect [this r]
+    (let [^Ray _r r
+          A (vdot3 (.direction _r) (.direction _r))
+          B (* 2.0 (vdot3 (.direction _r) (.origin _r)))
+          C (- (vdot3 (.origin _r) (.origin _r)) (sq (.radius this) ))]
       (if-let [t (quadratic A B C)]
         (let [t0 (first t)
               t1 (second t)]
-          (if-not (or (> t0 (.maxt r)) (< t1 (.mint r)))
-            (if (< t0 (.mint r))
-              [ (> (.maxt r) t1) t1]
+          (if-not (or (> t0 (.maxt _r)) (< t1 (.mint _r)))
+            (if (< t0 (.mint _r))
+              [ (> (.maxt _r) t1) t1]
               [ true t0]))))))
                  
- ;;        (intersectP [shape r ] false))
+ ;;        (intersectP [this r ] false))
   Object
   (toString [this] (str radius)))
 
 
-(defn new-sphere [r] (Sphere. r))
+(defn new-sphere [^double r] (Sphere. r))

@@ -3,7 +3,8 @@
   (:use cexirt.essentials)
   (:use [clojure.pprint :only [pprint]]))
 
-; (set! *unchecked-math* true)
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 (def ^:const pi Math/PI)
 (def ^:const eps 4e-5)

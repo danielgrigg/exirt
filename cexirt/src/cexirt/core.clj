@@ -4,17 +4,26 @@
   (:use cexirt.essentials)
   (:use cexirt.geom)
   (:use cexirt.limath)
+  (:use cexirt.sampling)
+  (:use cexirt.filters)
   (:use cexirt.film)
   (:use cexirt.camera)
   (:require cexirt.forge)
   (:use [clojure.pprint :only [pprint]]))
-                
+
+(import cexirt.geom.Ray)
+;;(import cexirt.geom.RayIntersections)
+;;(import cexirt.geom.Sphere)
+
+(set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
+
 (defn test-screen-coverage [width height]
   (finish-framebuffer
    width height
    (map (fn [[r g]] [r g 0.0 1.0]) 
         (map
-         (fn [r] (let [d (.direction r)] (vnormalize4 [(d 0) (d 1) 0.5 0.0])))
+         (fn [^Ray r] (let [d (.direction r)] (vnormalize4 [(d 0) (d 1) 0.5 0.0])))
          (camera-rays width height (perspective (Math/toRadians 38.) 1.0 1.0 100.))))))
 
 (def ^:dynamic *world* (new-sphere 2.0))
@@ -22,8 +31,8 @@
 (def ^:const background [0.0 0.0 0.0 1.0])
 (def ^:const default-perspective (perspective (Math/toRadians 38.) 1.0 1.0 100.))
 
-(defn trace-world [ray]
-  (let [r-world (transform ray (inverse *world-transform*))]
+(defn trace-world [^Ray ray]
+  (let [^Ray r-world (transform-object ray (inverse *world-transform*))]
     (if-let [hit (intersect *world* r-world)]
       (ray-at r-world (second hit)))))
 
@@ -63,8 +72,14 @@
     (println "w " w " h " h " fov " fov " r " r)
     ;;    (test-screen-coverage)
     
-    (let [f (cexirt.forge/make-sin-clamped-f)]
-      (finish-framebuffer w h (cexirt.forge/graph2 w h f)))
+    (let [;;f cexirt.forge/sin-theta-f
+          f (cexirt.forge/make-sin-clamped-f)
+          n-samples r
+          sampler (cexirt.sampling/sampler-stratify2 n-samples)
+          filter (gaussian-filter)]
+;;          filter (gaussian-filter 4.0 0.2)] 
+      (finish-framebuffer w h
+                          (cexirt.forge/graph2-aa w h sampler filter f)))
     
     (comment (binding [*world* (new-sphere r)]
       (finish-framebuffer

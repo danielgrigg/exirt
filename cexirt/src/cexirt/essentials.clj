@@ -1,6 +1,7 @@
 (ns cexirt.essentials)
 
 (set! *warn-on-reflection* true)
+(set! *unchecked-math* true)
 
 (defmacro bench [n & exprs]
   `(time
