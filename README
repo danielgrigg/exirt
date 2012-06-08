@@ -1,0 +1,22 @@
+A fun little project answering the question no one asked, what does a ray-tracer look like in Clojure?
+
+For most people the answer is, 'Get back evil-creature!'. For others, there's cexirt.
+
+Building
+========
+
+Ok it's a mess but I reckon it's still better organised than most Lisp projects out there.. (ouch!)
+
+1. Build basic_exr
+  basic_exr is a tiny-winy c++ library to write OpenEXR images. To build it you'll first need:
+    OpenEXR - obviously
+    cmake - configure the build
+    ruby1.9+ - to meta-configure the Building
+
+All the above are available in Macports..
+
+2. Lein Run/repl/compile/uberjar your way to goodness in cexirt
+
+There's little separation between 'testing' and 'running' currently.  The results of 
+running really depends on the last commit *evil grin*.
+
