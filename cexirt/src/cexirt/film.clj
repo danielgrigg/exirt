@@ -80,7 +80,7 @@
 
 (defn pixel-null []
   "Create a blank pixel."
-  (Pixel. [0.0 0.0 0.0] 0.0))
+  (atom (Pixel. [0.0 0.0 0.0] 0.0)))
 
 ;; NDC to screen coordinates
 (defn screen-transform [^double w ^double h]
@@ -98,22 +98,23 @@
 
 (defn film-new [^FilmRect film-bounds]
   (Film. film-bounds
-         (vec (for [r (range (film-height film-bounds))]
-                (vec (for [c (range (film-width film-bounds))]
-                       (atom (pixel-null))))))))
+         (vec (repeatedly
+               (* (film-height film-bounds) (film-width film-bounds))
+               pixel-null))))
+
+(defn film-pixel [^Film film ^long x ^long y]
+  ((.pixels film) (+ (* y (film-width (.bounds film))) x)))
 
 (defn film-write-framebuffer [^Film film]
   "Write the film contents to a framebuffer"
-  (mapcat (fn [row]
-            (map (fn [pxl] (dither (pixel-value @pxl))) row))
-          (.pixels film)))
+    (map (fn [pxl] (pixel-value @pxl)) (.pixels film)))
 
 (defn film-add-sample [^Film film ^Filter filter ^Sample sample]
   (doseq [pxl (sample-coverage sample (.width filter) (.bounds film))]
     (let [x-f (- (.x-film sample) (continuous (pxl 0)))
           y-f (- (.y-film sample) (continuous (pxl 1)))
           weight (.evaluate filter x-f y-f)]
-      (swap! (((.pixels film) (pxl 1)) (pxl 0))
+      (swap! (film-pixel film (pxl 0) (pxl 1)) 
              pixel-add-weighted (.radiance sample) weight))))
 
 (defn native-framebuffer [fb]

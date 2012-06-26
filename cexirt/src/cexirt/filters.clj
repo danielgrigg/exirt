@@ -77,8 +77,11 @@
             y (* (.width f) (- (* 2.0 (+ r 0.5) dw) 1.0))]
         (aset2-float a w r c (.evaluate f x y))))
     a))
-    
+
+;; nice idea, but in practice seems to be slower.  compute >> memory latency and all that.
+;; Can't imagine clojure/jvm makes much of an effort towards l* caching either.
 (defn table-filter [^Filter f ^long width]
+  "A filter that is a lookup table of another filter f"
   (let [table (float-array (* width width))
         dw (double (/ width))
         inv-fwidth (double (/ (.width f)))]

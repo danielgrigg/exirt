@@ -9,10 +9,10 @@
   (:require [incanter core charts stats]))
 
 (import cexirt.filters.Filter)
-;;(import cexirt.geom.BoundingBox2)
 (import cexirt.film.FilmRect)
 (import cexirt.film.Film)
 (import cexirt.sampling.Sample)
+(import '(java.util.concurrent Executors))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
@@ -93,31 +93,29 @@
                   (film-width film-bounds) (film-height film-bounds))
         L (func xy)]
     (film-add-sample film filter (sample-computed sample L))))
+ 
+(defn block-size [n nblocks]
+  (if (zero? (mod n nblocks))
+    (quot n nblocks)
+    (inc (quot n nblocks))))
 
-
-(defn graph2-aa [w h sampler ^Filter filter func]
-  (let [^Film film (film-new (film-rect-width-height 0 0 w h))
-        ^FilmRect bordered (film-bounds-with-filter
+(defn pgraph [^Film film ^Filter filter sampler-f func nthreads blocks-per-thread]
+  (let [^FilmRect bordered (film-bounds-with-filter
                              (.bounds film)
-                             (.width filter))]
-    (do
-      (println "filter-width " (.width filter))
-      (println "bordered-bounds " bordered)
-      (doseq [s (mapcat (partial pixel-samples sampler)
-                        (coordinates2 (film-width bordered)
-                                      (film-height bordered)))]
-        (eval-sample film filter func (sample-new s)))
-      (film-write-framebuffer film))))
-
-(defn pgraph2-aa [w h sampler func]
-  (let [^Film film (film-new (film-rect-width-height 0 0 w h))
-        ^FilmRect film-bounds (.bounds film)
-        filter (gaussian-filter 2.0 2.0)        
-        pixel-blocks (partition (quot (* w h) 4)
-                                (coordinates2 (film-width film-bounds)
-                                              (film-height film-bounds)))]
-    (dorun (pmap (fn [pixels]
-                   (doseq [s (mapcat (partial pixel-samples sampler) pixels)]
-                     (eval-sample film filter func (sample-new s))))
-                 pixel-blocks))))
-
+                             (.width filter))
+        samples (partial pixel-samples sampler-f)
+        pool (Executors/newFixedThreadPool nthreads)
+        npixels (* (film-width bordered) (film-height bordered))
+        nblocks (* nthreads blocks-per-thread)
+        npixels-task (block-size npixels nblocks)
+        tasks (map (fn [ps]
+                     (fn []
+                       (doseq [xy (mapcat samples ps)]
+                         (eval-sample film filter func (sample-new xy)))))
+                   (partition-all npixels-task
+                                  (coordinates2 (film-width bordered)
+                                                (film-height bordered))))]
+        (doseq [future (.invokeAll pool tasks)]
+          (.get future))
+        (.shutdown pool)
+        (film-write-framebuffer film)))

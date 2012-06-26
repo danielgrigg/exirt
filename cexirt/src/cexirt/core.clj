@@ -74,15 +74,16 @@
           f (cexirt.forge/make-sin-clamped-f)
           n-samples r
           sampler (cexirt.sampling/sampler-stratify2 n-samples)
+          film (film-new (film-rect-width-height 0 0 w h))
 ;;          filter (table-filter (gaussian-filter) 16)]
-          filter (box-filter)]
-;;          filter (gaussian-filter 4.0 0.2)] 
+          filter (gaussian-filter)]
       (finish-framebuffer w h
-                          (cexirt.forge/graph2-aa w h sampler filter f)))
+                          (map dither ;;identity
+                               (cexirt.forge/pgraph film filter sampler f 4 16))))))
     
-    (comment (binding [*world* (new-sphere r)]
-      (finish-framebuffer
-       w h
-       (map dither
-            (sphere-trace w h fov shade-diffuse)))))))
+;;    (comment (binding [*world* (new-sphere r)]
+;;      (finish-framebuffer
+;;       w h
+;;       (map dither
+;;            (sphere-trace w h fov shade-diffuse)))))))
 
