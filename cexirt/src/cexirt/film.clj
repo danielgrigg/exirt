@@ -100,11 +100,12 @@
   (Film. film-bounds
          (vec (for [r (range (film-height film-bounds))]
                 (vec (for [c (range (film-width film-bounds))]
-                       (ref (pixel-null))))))))
+                       (atom (pixel-null))))))))
 
 (defn film-write-framebuffer [^Film film]
   "Write the film contents to a framebuffer"
-  (mapcat (fn [row] (map (fn [pxl] (dither (pixel-value @pxl))) row))
+  (mapcat (fn [row]
+            (map (fn [pxl] (dither (pixel-value @pxl))) row))
           (.pixels film)))
 
 (defn film-add-sample [^Film film ^Filter filter ^Sample sample]
@@ -112,9 +113,8 @@
     (let [x-f (- (.x-film sample) (continuous (pxl 0)))
           y-f (- (.y-film sample) (continuous (pxl 1)))
           weight (.evaluate filter x-f y-f)]
-      (dosync
-       (commute (((.pixels film) (pxl 1)) (pxl 0))
-                pixel-add-weighted (.radiance sample) weight)))))
+      (swap! (((.pixels film) (pxl 1)) (pxl 0))
+             pixel-add-weighted (.radiance sample) weight))))
 
 (defn native-framebuffer [fb]
   (float-array (apply concat fb)))
