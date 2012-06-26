@@ -105,7 +105,7 @@
 (defn film-pixel [^Film film ^long x ^long y]
   ((.pixels film) (+ (* y (film-width (.bounds film))) x)))
 
-(defn film-write-framebuffer [^Film film]
+(defn film-framebuffer [^Film film]
   "Write the film contents to a framebuffer"
     (map (fn [pxl] (pixel-value @pxl)) (.pixels film)))
 
@@ -117,9 +117,12 @@
       (swap! (film-pixel film (pxl 0) (pxl 1)) 
              pixel-add-weighted (.radiance sample) weight))))
 
-(defn native-framebuffer [fb]
+(defn- framebuffer-native [fb]
   (float-array (apply concat fb)))
 
-(defn finish-framebuffer [^long width ^long height fb]
-    (jna-call :exr_basic "write_rgba" Integer width height
-              (native-framebuffer fb)))
+(defn framebuffer-finish [^Film film out-path]
+  (jna-call :exr_basic "write_rgba"
+            Integer (film-width (.bounds film)) (film-height (.bounds film))
+            out-path
+            (framebuffer-native
+             (film-framebuffer film))))

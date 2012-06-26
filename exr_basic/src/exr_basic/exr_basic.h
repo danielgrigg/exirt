@@ -2,7 +2,10 @@
 #define EXR_BASIC_H
 
 extern "C" {
-  int write_rgba(int width, int height, const float* raw_rgbas);
+  int write_rgba(int width, 
+      int height, 
+      char* filename,
+      const float* raw_rgbas);
 }
 
 #endif

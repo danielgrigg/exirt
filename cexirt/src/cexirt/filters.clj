@@ -61,39 +61,3 @@
      (Filter. width
               (fn [^double x ^double y]
                 (* (mitchell1 B C (/ x width)) (mitchell1 B C (/ y width)))))))
-
-(defmacro aget2 [a stride y x]
-  `(aget ~a (int (+ ~x (* ~y ~stride)))))
-
-(defmacro aset2-float [a stride y x value]
-  `(aset-float ~a (int (+ ~x (* ~y ~stride))) ~value))
-                     
-(defn create-filter-table
-  [^Filter f ^long w]
-  (let [a (float-array (* w w))
-        dw (double (/ w))]
-    (doseq [r (range w) c (range w)]
-      (let [x (* (.width f) (- (* 2.0 (+ c 0.5) dw) 1.0))
-            y (* (.width f) (- (* 2.0 (+ r 0.5) dw) 1.0))]
-        (aset2-float a w r c (.evaluate f x y))))
-    a))
-
-;; nice idea, but in practice seems to be slower.  compute >> memory latency and all that.
-;; Can't imagine clojure/jvm makes much of an effort towards l* caching either.
-(defn table-filter [^Filter f ^long width]
-  "A filter that is a lookup table of another filter f"
-  (let [table (float-array (* width width))
-        dw (double (/ width))
-        inv-fwidth (double (/ (.width f)))]
-    (doseq [r (range width) c (range width)]
-      (let [x (* (.width f) (- (* 2.0 (continuous c) dw) 1.0))
-            y (* (.width f) (- (* 2.0 (continuous r) dw) 1.0))]
-        (aset2-float table width r c (.evaluate f x y))))
-
-    (Filter.
-     (.width f)
-     (fn [x y]
-       (let [r (int (* (- width 1) (+ (* x inv-fwidth  0.5) 0.5)))
-             c (int (* (- width 1) (+ (* y inv-fwidth 0.5) 0.5)))]
-         (do
-           (aget2 table width r c)))))))

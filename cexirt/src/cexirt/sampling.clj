@@ -13,8 +13,8 @@
 (defn sample-new [film-xy]
   (Sample. (film-xy 0) (film-xy 1) [0.0 0.0 0.0]))
 
-(defn sample-computed [^Sample s radiance-value]
-  (Sample. (.x-film s) (.y-film s) radiance-value))
+(defn sample-radiance [^Sample s L]
+  (Sample. (.x-film s) (.y-film s) L))
 
 (defn stratify1 [^long w]
   (let [inv-w (double (/ w))]
@@ -25,7 +25,6 @@
     (for [x (range w) y (range h)]
       [ (* (+ x (rand)) inv-w) (* (+ y (rand)) inv-h)])))
 
-;; TODO - this feels icky, but I do like granting all samplers a uniform interface.
 (defn sampler-stratify2 [^long n-samples]
   (let [w (long (Math/ceil (Math/sqrt n-samples)))]
     (partial stratify2 w w)))

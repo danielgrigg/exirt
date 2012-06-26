@@ -40,18 +40,6 @@ PROJECT =
       :include_dirs => [],
       :link_dirs => [] 
     }
-  }, {
-    :name => "helloworld",
-    :type => :executable,
-    :depends => "exr_basic",
-    :install => false,
-    :sources => "apps/helloworld",
-    :common => {
-    :packages => [],
-    :definitions => [],
-    :include_dirs => [],
-    :link_dirs => [],
-    :libs => ["exr_basic"]                                                          
-  }}]
+  }]
 }
 

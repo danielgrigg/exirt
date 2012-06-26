@@ -232,5 +232,4 @@
   Object
   (toString [this] (str radius)))
 
-
 (defn new-sphere [^double r] (Sphere. r))

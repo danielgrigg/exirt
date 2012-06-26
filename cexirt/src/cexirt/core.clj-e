@@ -37,7 +37,7 @@
   (let [S (screen-transform screen-w screen-h)
         SP (compose S proj-t)]
     (fn [^Sample sample]
-      (let [^Ray r-camera (camera-ray (.x-film sample) (.y-film sample) SP)
+      (let [^Ray r-camera (new-camera-ray (.x-film sample) (.y-film sample) SP)
             ^Ray r-world (transform-object r-camera (inverse world-t))
             L (if-let [hit (intersect world r-world)]
                 (shade-normal (ray-at r-world (second hit)))

@@ -9,9 +9,12 @@
 //#include <OpenEXR/ImfStringAttribute.h>
 //#include <OpenEXR/ImfMatrixAttribute.h>
 
-int write_rgba(int width, int height, const float* raw_rgbas) {
-  const char fname[] = "/tmp/basic_exr.exr";
-  Imf::Rgba c(0.1, 0.1, 1.0, 1.0);
+int write_rgba(int width, 
+    int height, 
+    char* filename, 
+    const float* raw_rgbas) {
+
+  //const char fname[] = "/tmp/basic_exr.exr";
   std::vector<Imf::Rgba> pixels(width * height);
   for (int p = 0; p < width * height; ++p) {
     pixels[p] = Imf::Rgba(raw_rgbas[4*p+0], 
@@ -19,10 +22,9 @@ int write_rgba(int width, int height, const float* raw_rgbas) {
                           raw_rgbas[4*p+2],
                           raw_rgbas[4*p+3]);
   }
-  Imf::RgbaOutputFile file (fname, width, height, Imf::WRITE_RGBA);
+  Imf::RgbaOutputFile file (filename, width, height, Imf::WRITE_RGBA);
   file.setFrameBuffer(&pixels[0], 1, width);
   file.writePixels (height); 
-
   return 1;
 }
 
