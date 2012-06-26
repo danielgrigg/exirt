@@ -2,6 +2,7 @@
   (:use cexirt.essentials)
   (:use cexirt.limath)
   (:use cexirt.geom)
+  (:use cexirt.filters)
   (:use cexirt.sampling))
 
 (import cexirt.sampling.Sample)

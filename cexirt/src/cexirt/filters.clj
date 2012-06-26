@@ -78,7 +78,7 @@
         (aset2-float a w r c (.evaluate f x y))))
     a))
     
-(defn table-filter [^Filter f width]
+(defn table-filter [^Filter f ^long width]
   (let [table (float-array (* width width))
         dw (double (/ width))
         inv-fwidth (double (/ (.width f)))]
@@ -86,9 +86,11 @@
       (let [x (* (.width f) (- (* 2.0 (continuous c) dw) 1.0))
             y (* (.width f) (- (* 2.0 (continuous r) dw) 1.0))]
         (aset2-float table width r c (.evaluate f x y))))
-    (fn [x y]
-      (let [r (int (* width (+ (* x inv-fwidth  0.5) 0.5)))
-            c (int (* width (+ (* y inv-fwidth 0.5) 0.5)))]
-        (do
-          (prn r " " c)
-          (aget2 table width r c))))))
+
+    (Filter.
+     (.width f)
+     (fn [x y]
+       (let [r (int (* (- width 1) (+ (* x inv-fwidth  0.5) 0.5)))
+             c (int (* (- width 1) (+ (* y inv-fwidth 0.5) 0.5)))]
+         (do
+           (aget2 table width r c)))))))

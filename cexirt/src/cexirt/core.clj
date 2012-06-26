@@ -70,13 +70,12 @@
     (println "Running cexirt with "
              (/ (.maxMemory (java.lang.Runtime/getRuntime)) 1024.0 1024.0) " MB memory")
     (println "w " w " h " h " fov " fov " r " r)
-    ;;    (test-screen-coverage)
-    
     (let [;;f cexirt.forge/sin-theta-f
           f (cexirt.forge/make-sin-clamped-f)
           n-samples r
           sampler (cexirt.sampling/sampler-stratify2 n-samples)
-          filter (gaussian-filter)]
+;;          filter (table-filter (gaussian-filter) 16)]
+          filter (box-filter)]
 ;;          filter (gaussian-filter 4.0 0.2)] 
       (finish-framebuffer w h
                           (cexirt.forge/graph2-aa w h sampler filter f)))
