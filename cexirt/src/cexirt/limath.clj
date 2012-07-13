@@ -102,9 +102,9 @@
 
 (make-vec-length)             
 
-(defn vnormalize2 [a] (vmul2s a (/ (vlength2 a))))
-(defn vnormalize3 [a] (vmul3s a (/ (vlength3 a))))
-(defn vnormalize4 [a] (vmul4s a (/ (vlength4 a))))
+(defn vnormalize2 [a] (vmul2s a (/ (max eps (vlength2 a)))))
+(defn vnormalize3 [a] (vmul3s a (/ (max eps (vlength3 a)))))
+(defn vnormalize4 [a] (vmul4s a (/ (max eps (vlength4 a)))))
 
 (defn cross [a b]
   [(- (* (a 1) (b 2)) (* (a 2) (b 1)))
