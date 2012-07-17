@@ -46,7 +46,15 @@
     (quot n nblocks)
     (inc (quot n nblocks))))
 
-(defn prender [^Film film ^Filter filter sampler-f evaluator-f nthreads blocks-per-thread]
+(defn prender
+  "Parallel renderer of an arbitrary evaluator-f"
+  [^Film film ^Filter filter sampler-f evaluator-f nthreads blocks-per-thread]
+
+  ;; Ideally the work could be spread evenly over nthreads, but in practice the work
+  ;; depends on the scene content. A simple solution is diffusing that irregularity by
+  ;; upping the thread count, in our case, assigning blocks-per-thread per thread.
+  ;; Each task then simply computes evaluator-f for every sample of its assigned
+  ;; pixels and splats the result to the shared film.
   (let [^FilmRect bordered (film-bounds-with-filter
                              (.bounds film)
                              (.width filter))

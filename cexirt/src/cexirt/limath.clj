@@ -8,6 +8,7 @@
 
 (def ^:const pi Math/PI)
 (def ^:const eps 4e-5)
+(def ^:const eps-small 1.4E-45)
 (def ^:const infinity 1e37)
 
 (defn sq [^double x] (* x x))
@@ -55,6 +56,14 @@
   `(~rop ~@(for [x (range n)]
              `(~mop ~@(for [y args] `(~y ~x))))))
 
+(defmacro make-vec-unary-ops [name desc op]
+  (cons `do
+        (for [n [2 3 4]]
+          `(defn ~(str-sym \v name n)
+             ~(str desc " a " n "-vector")
+             [~'a]
+             (vec-op ~op ~n ~'a)))))
+
 ;; generates vector functions for 2, 3 & 4 component vectors.
 (defmacro make-vec-ops [name desc op self-op]
   (cons `do
@@ -92,6 +101,8 @@
 (make-vec-scalar-ops mul "Multiply" *)
 (make-vec-scalar-ops div "Divide" /)
 (make-vec-reduce-ops equal "Equality" and equal-scalar false)
+(make-vec-unary-ops floor "floor" Math/floor)
+(make-vec-unary-ops ceil "ceil" Math/ceil)
 
 (defmacro make-vec-length []
   (cons `do

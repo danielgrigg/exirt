@@ -1,6 +1,7 @@
 (ns cexirt.film
   (:use cexirt.essentials)
   (:use cexirt.limath)
+  (:use cexirt.transform)
   (:use cexirt.geom)
   (:use cexirt.filters)
   (:use cexirt.sampling))
@@ -28,15 +29,17 @@
                    (min (.x1 this) (.x1 other))
                    (min (.y1 this) (.y1 other))))
 
-(defn film-bounds-with-filter [^FilmRect bounds ^double filter-width]
-  "Calculate sampling bounds needed to cover the input bounds given a filter-width"
+(defn film-bounds-with-filter 
+  "Calculate sampling bounds needed to cover the input bounds with a filter of width, filter-width"
+  [^FilmRect bounds ^double filter-width]
   (FilmRect. (discrete (- (continuous (.x0 bounds)) filter-width))
              (discrete (- (continuous (.y0 bounds)) filter-width))
              (discrete (+ (continuous (.x1 bounds)) filter-width))
              (discrete (+ (continuous (.y1 bounds)) filter-width))))
 
-(defn sample-coverage-bounds [^Sample s ^double filter-width]
+(defn sample-coverage-bounds
   "Continuous bounding-box of pixels contributed to by sample. Not clipped."
+   [^Sample s ^double filter-width]
   [(- (.x-film s) filter-width -0.5)
    (- (.y-film s) filter-width -0.5)
    (+ (.x-film s) filter-width +0.5)
@@ -58,9 +61,6 @@
                      clip-bounds)]
     (for [y (range (.y0 B) (.y1 B))
           x (range (.x0 B) (.x1 B))] [x y])))
-
-;;(definterface PixelOps
-;;  (^Pixel add-weighted [L ^double weight]))
 
 (deftype Pixel [xyz ^double weight]
   Object
