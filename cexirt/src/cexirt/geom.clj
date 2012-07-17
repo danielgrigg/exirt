@@ -2,6 +2,7 @@
   (:require [clojure.math.numeric-tower :as numeric])
   (:use cexirt.limath)
   (:use cexirt.transform)
+  (:use cexirt.ray)
   (:use [clojure.pprint :only [pprint]]))
 
 (set! *warn-on-reflection* true)
@@ -10,49 +11,10 @@
 (defprotocol Transformable
   (transform-object [this T]))
 
-
 (definterface Bounding
   (^double width [])
   (^double height [])
   (^double depth []))
-
-(deftype BoundingBox2 [^double x0 ^double y0 ^double x1 ^double y1]
-  Bounding
-  (width [this]
-    (- x1 x0))
-  (height [ this]
-    (- y1 y0))
-  (depth [this] 0.0)
-
-  Object
-  (toString [this]
-   (str "(" x0 " " y0 ") (" x1 " " y1 ")")))
-
-(defn clip-bounding-box2 [^BoundingBox2 this ^BoundingBox2 other]
-    (BoundingBox2. (max (.x0 this) (.x0 other))
-                   (max (.y0 this) (.y0 other))
-                   (min (.x1 this) (.x1 other))
-                   (min (.y1 this) (.y1 other))))
-
-
-(defn bounding-box2 [[x0 y0] [x1 y1]]
-  (BoundingBox2. x0 y0 x1 y1))
-
-
-(deftype BoundingBox3 [^double x0 ^double y0 ^double z0 ^double x1 ^double y1 ^double z1]
-  Bounding
-  (width [this]
-    (- x1 x0))
-  (height [ this]
-    (- y1 y0))
-  (depth [this] (- z1 z0))
-
-  Object
-  (toString [this]
-    (str "(" x0 " " y0 " " z0 ") (" x1 " " y1 " " z1 ")")))
-
-(defn bounding-box3 [[x0 y0 z0] [x1 y1 z1]]
-  (BoundingBox3. x0 y0 z0 x1 y1 z1))
 
 (deftype Ray [origin direction ^double mint ^double maxt]
   Transformable
@@ -79,10 +41,86 @@
   ([origin direction mint maxt]
      (Ray. origin direction mint maxt)))
 
+
+
+(deftype Intersection [point normal])
+    
 ;; "Ray to shape intersection methods"
 (defprotocol RayIntersection
   ( intersect [this r]);; "Distance to intersection")
   )
+
+(deftype BoundingBox3 [^double x0 ^double y0 ^double z0 ^double x1 ^double y1 ^double z1]
+  Bounding
+  (width [this]
+    (- x1 x0))
+  (height [ this]
+    (- y1 y0))
+  (depth [this] (- z1 z0))
+  
+  Object
+  (toString [this]
+    (str "(" x0 " " y0 " " z0 ") (" x1 " " y1 " " z1 ")")))
+
+(defn bounding-box3 [[x0 y0 z0] [x1 y1 z1]]
+  (BoundingBox3. x0 y0 z0 x1 y1 z1))
+
+(defn bbox-centre [^BoundingBox3 b]
+  (point3 (* (+ (.x0 b) (.x1 b)) 0.5)
+             (* (+ (.y0 b) (.y1 b)) 0.5)
+             (* (+ (.z0 b) (.z1 b)) 0.5)))
+(defn bbox-min [^BoundingBox3 b]
+  (point3 (.x0 b) (.y0 b) (.z0 b)))
+
+(defn bbox-max [^BoundingBox3 b]
+  (point3 (.x1 b) (.y1 b) (.z1 b)))
+
+(defn slab-intersect [^BoundingBox3 B ^Ray r e f t-min t-max]
+  (if (> (numeric/abs f) eps-small)
+    (let [e1 (+ e (.width B))
+          t1' (/ e1 f)
+          t2' (/ e f)
+          [t1 t2] (if (> t1' t2') [t2' t1'] [t1' t2'])
+          t-min' (max t-min t1)
+          t-max' (min t-max t2)]
+      (if-not (or (> t-min' t-max') (< t-max' 0))
+        [t-min' t-max']))
+    (if-not (or (> (- (+ e (.width B))) 0) (< (- e) 0))
+      [t-min t-max])))
+
+(defn bounding-box3-intersect-ray [^BoundingBox3 B ^Ray r]
+  (let [e (vsub3 (bbox-min B) (.origin r))]
+        
+    (if-let [[tmin-x tmax-x] (slab-intersect B
+                                             r
+                                             (e 0)
+                                             ((.direction r) 0)
+                                             (- infinity)
+                                             infinity)]
+      (if-let [[tmin-y tmax-y] (slab-intersect B
+                                               r
+                                               (e 1)
+                                               ((.direction r) 1)
+                                               tmin-x
+                                               tmax-x)]
+        (if-let [[tmin tmax] (slab-intersect B
+                                             r
+                                             (e 2)
+                                             ((.direction r) 2)
+                                             tmin-y
+                                             tmax-y)]
+          (if (> tmin 0.0) tmin tmax))))))
+
+;;(for [y (range -3 5)]
+;;  [y (bounding-box3-intersect-ray (bounding-box3 (point3 -0.5 -0.5 -0.5) (point3 2.5 2.5 2.5))
+;;                               (ray (point3 y 1 4) (vector3 0 0 -1)))])
+  
+(extend-type BoundingBox3  
+  RayIntersection
+  (intersect [this _r]
+    (let [^Ray r _r]
+      (bounding-box3-intersect-ray this r)))
+)
 
 (deftype Plane [position normal]
   RayIntersection
@@ -142,4 +180,11 @@
 
 (defn triangle [p0 p1 p2]
   (Triangle. p0 p1 p2))
-    
+
+(deftype Primitive [shape transform]
+  RayIntersection
+  (intersect [this _r]
+    (let [^Ray r _r]
+      0.0))
+  Object
+  (toString [this] (str shape " " transform)))

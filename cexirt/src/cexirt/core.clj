@@ -20,12 +20,13 @@
 
 ;;(def ^:dynamic *world* (sphere 2.0))
 ;;(def ^:dynamic *world* (triangle (point3 -1 -1 0) (point3 1 -1 0) (point3 0 1 0)))
-;;(def ^:dynamic *world-transform*
-;;  (compose (translate 0 0 -4) (rotate-axis 0.5 (vector3 0 1 0))))
 
 ;;(def world (atom (triangle (point3 -1 -1 0) (point3 1 -1 0) (point3 0 1 0))))
-@(def world (atom (plane (point3 0 -1.5 0) (vector3 0 1 0))))
-(def world-transform (atom (translate 0 0 -4)))
+                                        ;(def world (atom (plane (point3 0 -1.5 0) (vector3 0 1 0))))
+(def world (atom (bounding-box3 (point3 -1 -1 -1) (vector3 2 2 2))))
+;(def world-transform (atom (translate 0 0 -9)))
+(def world-transform (atom (compose (translate -1 0 -9)
+                                    (rotate-axis 0.9 (vector3 1 1 0)))))
 
 
 (def ^:const default-perspective (perspective (Math/toRadians 38.) 1.0 1.0 100.))
@@ -61,9 +62,9 @@
       (let [^Ray r-camera (camera-ray (.x-film sample) (.y-film sample) SP)
             ^Ray r-world (transform-object r-camera (inverse @world-transform))
             L (if-let [hit (intersect @world r-world)]
-                ;(shade-normal (ray-at r-world hit))
+                (shade-normal (ray-at r-world hit))
                                         ;[1.0 1.0 1.0]
-                (shade-checker (ray-at r-world hit))
+                ;(shade-checker (ray-at r-world hit))
                 [0. 0. 0. ])]
         (sample-radiance sample L)))))
 
