@@ -75,45 +75,30 @@
 (defn bbox-max [^BoundingBox3 b]
   (point3 (.x1 b) (.y1 b) (.z1 b)))
 
-(defn slab-intersect [^BoundingBox3 B ^Ray r e f t-min t-max]
-  (if (> (numeric/abs f) eps-small)
-    (let [e1 (+ e (.width B))
-          t1' (/ e1 f)
-          t2' (/ e f)
-          [t1 t2] (if (> t1' t2') [t2' t1'] [t1' t2'])
-          t-min' (max t-min t1)
-          t-max' (min t-max t2)]
-      (if-not (or (> t-min' t-max') (< t-max' 0))
-        [t-min' t-max']))
-    (if-not (or (> (- (+ e (.width B))) 0) (< (- e) 0))
-      [t-min t-max])))
+(defn bbox-size [^BoundingBox3 b] (vector3 (.width b) (.height b) (.depth b)))
 
 (defn bounding-box3-intersect-ray [^BoundingBox3 B ^Ray r]
-  (let [e (vsub3 (bbox-min B) (.origin r))]
-        
-    (if-let [[tmin-x tmax-x] (slab-intersect B
-                                             r
-                                             (e 0)
-                                             ((.direction r) 0)
-                                             (- infinity)
-                                             infinity)]
-      (if-let [[tmin-y tmax-y] (slab-intersect B
-                                               r
-                                               (e 1)
-                                               ((.direction r) 1)
-                                               tmin-x
-                                               tmax-x)]
-        (if-let [[tmin tmax] (slab-intersect B
-                                             r
-                                             (e 2)
-                                             ((.direction r) 2)
-                                             tmin-y
-                                             tmax-y)]
-          (if (> tmin 0.0) tmin tmax))))))
-
-;;(for [y (range -3 5)]
-;;  [y (bounding-box3-intersect-ray (bounding-box3 (point3 -0.5 -0.5 -0.5) (point3 2.5 2.5 2.5))
-;;                               (ray (point3 y 1 4) (vector3 0 0 -1)))])
+  (let [ea (vsub3 (bbox-min B) (.origin r))
+        slab-intersect (fn [^long i ^double t-min ^double t-max]
+                         (let [f ((.direction r) i)
+                               e (ea i)]
+                           (if (> (numeric/abs f) eps-small)
+                             (let [e1 (+ e (.width B))
+                                   t1' (/ e1 f)
+                                   t2' (/ e f)
+                                   [t1 t2] (if (> t1' t2') [t2' t1'] [t1' t2'])
+                                   t-min' (max t-min t1)
+                                   t-max' (min t-max t2)]
+                       (if-not (or (> t-min' t-max') (< t-max' 0))
+                         [t-min' t-max']))
+                             (if-not (or (> (- (+ e (.width B))) 0) (< (- e) 0))
+                               [t-min t-max]))))]
+      
+    (if-let [[tmin-x tmax-x] (slab-intersect 0 (- infinity) infinity)]
+      (if-let [[tmin-y tmax-y] (slab-intersect 1 tmin-x tmax-x)]
+        (if-let [[tmin tmax] (slab-intersect 2 tmin-y tmax-y)]
+          (let [t (if (> tmin 0.0) tmin tmax)]
+            (if (> (.maxt r) t (.mint r)) t)))))))
   
 (extend-type BoundingBox3  
   RayIntersection

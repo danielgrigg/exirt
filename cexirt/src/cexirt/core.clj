@@ -9,6 +9,7 @@
   (:use cexirt.filters)
   (:use cexirt.film)
   (:use cexirt.camera)
+  (:use cexirt.voxel)
   (:require cexirt.forge)
   (:use [clojure.pprint :only [pprint]]))
 
@@ -18,15 +19,10 @@
 ;(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-;;(def ^:dynamic *world* (sphere 2.0))
-;;(def ^:dynamic *world* (triangle (point3 -1 -1 0) (point3 1 -1 0) (point3 0 1 0)))
-
-;;(def world (atom (triangle (point3 -1 -1 0) (point3 1 -1 0) (point3 0 1 0))))
-                                        ;(def world (atom (plane (point3 0 -1.5 0) (vector3 0 1 0))))
-(def world (atom (bounding-box3 (point3 -1 -1 -1) (vector3 2 2 2))))
-;(def world-transform (atom (translate 0 0 -9)))
-(def world-transform (atom (compose (translate -1 0 -9)
-                                    (rotate-axis 0.9 (vector3 1 1 0)))))
+(def world (atom (bounding-box3 (point3 -1 -1 -1) (point3 1 1 1))))
+;(def world-transform (atom (translate 0 0 -6)))
+(def world-transform (atom (compose (translate 0 0 -5)
+                                    (rotate-axis 1.0 (vector3 1 1 0)))))
 
 
 (def ^:const default-perspective (perspective (Math/toRadians 38.) 1.0 1.0 100.))
@@ -53,8 +49,22 @@
     (if (= 1 (bit-xor fx fz))
       [1.0 1.0 1.0]
       [0.0 0.0 0.0])))
+
+(defn voxel-evaluator [screen-w screen-h proj-t]
+  (let [S (screen-transform screen-w screen-h)
+        SP (compose S proj-t)]
+    (fn [^Sample sample]
+      (let [^Ray r-camera (camera-ray (.x-film sample) (.y-film sample) SP)
+            ^Ray r-world (transform-object r-camera (inverse @world-transform))
+            grid-bounds (bounding-box3 (point3 -1 -1 -1) (point3 1 1 1))
+            L (if-let [hit (intersect grid-bounds r-world)]
+                (let [n (count (voxel-seq3 grid-bounds [5 5 5] r-world))
+                      m (/ n 13.0)]
+                  [m m m ])
+                [0. 0. 0. ])]
+        (sample-radiance sample L)))))
+
         
-  
 (defn trace-evaluator [screen-w screen-h proj-t]
   (let [S (screen-transform screen-w screen-h)
         SP (compose S proj-t)]
@@ -78,11 +88,10 @@
 (defn -main [& args]
   (let [[w h fov n-samples frame-n] (map read-string (take 5 args))
         out-path (nth args 5 "out")
-        f (trace-evaluator w h
-                           (perspective (Math/toRadians fov) (double (/ w h)) 1.0 100.))
-         ;;                  *world-transform*
-         ;;                  *world*)
+        P (perspective (Math/toRadians fov) (double (/ w h)) 1.0 1000.)
+        f (trace-evaluator w h P)        
         g (plot-evaluator w h cexirt.forge/sin-theta-f)
+        v-f (voxel-evaluator w h P)
         sampler (cexirt.sampling/sampler-stratify2 n-samples)
         film (film-new (film-rect-width-height 0 0 w h))
         ;;          filter (table-filter (gaussian-filter) 16)]
@@ -100,7 +109,7 @@
           (println "rendering " frame-path)
   ;;        (swap! world-transform frame-transform t)
           (framebuffer-finish
-           (cexirt.forge/prender film filter sampler f 4 16)
+           (cexirt.forge/prender film filter sampler v-f 4 16)
            frame-path))
         nil)))
 

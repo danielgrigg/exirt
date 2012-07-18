@@ -1,5 +1,5 @@
 (ns cexirt.limath
-  (:require [clojure.math.numeric-tower :as math])
+  (:require [clojure.math.numeric-tower :as numeric])
   (:use cexirt.essentials)
   (:use [clojure.pprint :only [pprint]]))
 
@@ -15,26 +15,26 @@
 
 (defn equal-scalar
   ([^double x ^double y]
-     (< (Math/abs (- x y)) eps))
+     (< (numeric/abs (- x y)) eps))
   ([^double x ^double y ^double tolerance]
-     (< (Math/abs (- x y)) tolerance)))
+     (< (numeric/abs (- x y)) tolerance)))
 
 (defn rand-gauss []
   (let [u (rand)
         v (rand)]
-    (* (Math/sqrt (* -2.0 (Math/log u))) (Math/cos (* 2.0 pi v)))))
+    (* (numeric/sqrt (* -2.0 (Math/log u))) (Math/cos (* 2.0 pi v)))))
 
 (defn rand-gauss2 []
   (let [u (rand)
         v (rand)]
-    [(* (Math/sqrt (* -2.0 (Math/log u))) (Math/cos (* 2.0 pi v)))
-     (* (Math/sqrt (* -2.0 (Math/log u))) (Math/sin (* 2.0 pi v)))]))
+    [(* (numeric/sqrt (* -2.0 (Math/log u))) (Math/cos (* 2.0 pi v)))
+     (* (numeric/sqrt (* -2.0 (Math/log u))) (Math/sin (* 2.0 pi v)))]))
 
 (defn quadratic [^double A ^double B ^double C]
   (let [discrim (- (* B B) (* 4.0 A C))]
     (if (< discrim 0)
       nil
-      (let [rootDiscrim (math/sqrt discrim)
+      (let [rootDiscrim (numeric/sqrt discrim)
             q (if (< B 0)
                 (* -0.5 (- B rootDiscrim))
                 (* -0.5 (+ B rootDiscrim)))
@@ -94,6 +94,8 @@
 (make-vec-ops sub "Subtract" - false)
 (make-vec-ops mul "Multiply" * false)
 (make-vec-ops div "Divide" / false)
+(make-vec-ops max "Maximum" max false)
+(make-vec-ops min "Minimum" min false)
 (make-vec-reduce-ops dot "Dot product" + * false)
 (make-vec-reduce-ops length-sq "Length^2" + * true)
 (make-vec-scalar-ops add "Add" +)
@@ -101,15 +103,16 @@
 (make-vec-scalar-ops mul "Multiply" *)
 (make-vec-scalar-ops div "Divide" /)
 (make-vec-reduce-ops equal "Equality" and equal-scalar false)
-(make-vec-unary-ops floor "floor" Math/floor)
-(make-vec-unary-ops ceil "ceil" Math/ceil)
+(make-vec-unary-ops floor "floor" numeric/floor)
+(make-vec-unary-ops ceil "ceil" numeric/ceil)
+(make-vec-unary-ops abs "abs" numeric/abs)
 
 (defmacro make-vec-length []
   (cons `do
         (for [n [2 3 4]]
           `(defn ~(str-sym \v "length" n)
              ~(str "Length of " n "-vector") [~'a]
-             (math/sqrt (~(str-sym "vlength-sq" n) ~'a))))))
+             (numeric/sqrt (~(str-sym "vlength-sq" n) ~'a))))))
 
 (make-vec-length)             
 
