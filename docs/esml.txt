@@ -1,0 +1,11 @@
+(csml
+ (sphere :x1 identity-transform)
+
+  (group  :g1 (translate 3 4 5)
+           [sphere (translate 1 1 1)]
+                    [box {:material "diffuse"} (translate 0 1 2)]
+                             [:x1 (translate 0 0 2)])
+   
+    (world :s1
+            [:g1]))
+

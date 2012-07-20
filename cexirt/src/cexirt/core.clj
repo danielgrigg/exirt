@@ -10,6 +10,7 @@
   (:use cexirt.film)
   (:use cexirt.camera)
   (:use cexirt.voxel)
+  (:use cexirt.prim)
   (:require cexirt.forge)
   (:use [clojure.pprint :only [pprint]]))
 
@@ -19,7 +20,7 @@
 ;(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def world (atom (bounding-box3 (point3 -1 -1 -1) (point3 1 1 1))))
+(def world (atom (bbox (point3 -1 -1 -1) (point3 1 1 1))))
 ;(def world-transform (atom (translate 0 0 -6)))
 (def world-transform (atom (compose (translate 0 0 -5)
                                     (rotate-axis 1.0 (vector3 1 1 0)))))
@@ -56,7 +57,7 @@
     (fn [^Sample sample]
       (let [^Ray r-camera (camera-ray (.x-film sample) (.y-film sample) SP)
             ^Ray r-world (transform-object r-camera (inverse @world-transform))
-            grid-bounds (bounding-box3 (point3 -1 -1 -1) (point3 1 1 1))
+            grid-bounds (bbox (point3 -1 -1 -1) (point3 1 1 1))
             L (if-let [hit (intersect grid-bounds r-world)]
                 (let [n (count (voxel-seq3 grid-bounds [5 5 5] r-world))
                       m (/ n 13.0)]

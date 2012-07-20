@@ -5,27 +5,26 @@
   (:use cexirt.geom)
   (:use [clojure.pprint :only [pprint]]))
 
-
 ;;(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(import cexirt.geom.BoundingBox3)
+(import cexirt.geom.BBox)
 
-;(def ^:dynamic *grid-bounds* (bounding-box3 [2 2 2] [7 9 13]))
+;(def ^:dynamic *grid-bounds* (bbox [2 2 2] [7 9 13]))
 ;(def ^:dynamic *test-ray* (ray (point3 0.5 7 5) (vector3 -2.0 -0.85 0.4)))
 
 (defn sign-step [x]
   (if (pos? x) 1 -1))
 
-(defn voxel-size [^BoundingBox3 b d]
+(defn voxel-size [^BBox b d]
   (vdiv3 (bbox-size b) d))
 
 (defn voxel-index-from-point [grid-bounds divisions p]
-  (vec (map int (vdiv3 (vsub3 p (bbox-min grid-bounds))
+  (vec (map int (vdiv3 (vsub3 p (.minp grid-bounds))
                        (voxel-size grid-bounds divisions)))))
 
 (defn voxel-index-to-point [grid-bounds divisions v]
-  (vadd3 (bbox-min grid-bounds)
+  (vadd3 (.minp grid-bounds)
          (vmul3 v (voxel-size grid-bounds divisions))))
 
 (defn- zero-min [^double x]

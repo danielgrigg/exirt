@@ -122,8 +122,8 @@
            [0. 0. -1. 0.]]]
     (matrix-transform M)))
 
-                                        ; project homogenous point to r3
-(defn project [p]
+(defn project "project homogenous point to r3"
+  [p]
   (if (zero? (p 3))
     p
     (vmul4s p (/ (p 3)))))

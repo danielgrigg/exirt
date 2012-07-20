@@ -2,14 +2,19 @@
   (:require [clojure.math.numeric-tower :as numeric])
   (:use cexirt.limath)
   (:use cexirt.transform)
-  (:use cexirt.ray)
   (:use [clojure.pprint :only [pprint]]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
+(import cexirt.transform.Transform)
+
+;
 (defprotocol Transformable
-  (transform-object [this T]))
+  (transform-object [this T] "Transform the object by T"))
+
+(defprotocol Bounded
+  (bounding-box [this] "Compute the AABB"))
 
 (definterface Bounding
   (^double width [])
@@ -41,8 +46,6 @@
   ([origin direction mint maxt]
      (Ray. origin direction mint maxt)))
 
-
-
 (deftype Intersection [point normal])
     
 ;; "Ray to shape intersection methods"
@@ -50,35 +53,38 @@
   ( intersect [this r]);; "Distance to intersection")
   )
 
-(deftype BoundingBox3 [^double x0 ^double y0 ^double z0 ^double x1 ^double y1 ^double z1]
+(deftype BBox [minp maxp]
   Bounding
-  (width [this]
-    (- x1 x0))
-  (height [ this]
-    (- y1 y0))
-  (depth [this] (- z1 z0))
-  
+  (width [this] (- (maxp 0) (minp 0)))
+  (height [ this] (- (maxp 1) (minp 1)))
+  (depth [this] (- (maxp 2) (minp 2)))
+
+  Bounded
+  (bounding-box [this]
+    this)
+    
   Object
   (toString [this]
-    (str "(" x0 " " y0 " " z0 ") (" x1 " " y1 " " z1 ")")))
+    (str minp " " maxp)))
 
-(defn bounding-box3 [[x0 y0 z0] [x1 y1 z1]]
-  (BoundingBox3. x0 y0 z0 x1 y1 z1))
+(defn bbox "Construct a BBox"
+  ([] 
+     (BBox. (point3 (- infinity) (- infinity) (- infinity))
+            (point3 infinity infinity infinity)))
+  
+ ([[x0 y0 z0 w0 :as p0] [x1 y1 z1 w1 :as p1]]
+     (BBox. (vmin4 p0 p1) (vmax4 p0 p1))))
 
-(defn bbox-centre [^BoundingBox3 b]
-  (point3 (* (+ (.x0 b) (.x1 b)) 0.5)
-             (* (+ (.y0 b) (.y1 b)) 0.5)
-             (* (+ (.z0 b) (.z1 b)) 0.5)))
-(defn bbox-min [^BoundingBox3 b]
-  (point3 (.x0 b) (.y0 b) (.z0 b)))
+(defn bbox-centre [^BBox b]
+  (vmul4 (vadd4 (.minp b) (.maxp b)) [0.5 0.5 0.5 1.] ))
 
-(defn bbox-max [^BoundingBox3 b]
-  (point3 (.x1 b) (.y1 b) (.z1 b)))
+(defn bbox-size [^BBox b] (vector3 (.width b) (.height b) (.depth b)))
 
-(defn bbox-size [^BoundingBox3 b] (vector3 (.width b) (.height b) (.depth b)))
+(defn bbox-union [^BBox b p]
+  (BBox. (vmin4 (.minp b) p) (vmax4 (.maxp b) p)))
 
-(defn bounding-box3-intersect-ray [^BoundingBox3 B ^Ray r]
-  (let [ea (vsub3 (bbox-min B) (.origin r))
+(defn bbox-ray-intersect [^BBox B ^Ray r]
+  (let [ea (vsub3 (.minp B) (.origin r))
         slab-intersect (fn [^long i ^double t-min ^double t-max]
                          (let [f ((.direction r) i)
                                e (ea i)]
@@ -99,13 +105,16 @@
         (if-let [[tmin tmax] (slab-intersect 2 tmin-y tmax-y)]
           (let [t (if (> tmin 0.0) tmin tmax)]
             (if (> (.maxt r) t (.mint r)) t)))))))
-  
-(extend-type BoundingBox3  
+
+(extend-type BBox  
   RayIntersection
   (intersect [this _r]
     (let [^Ray r _r]
-      (bounding-box3-intersect-ray this r)))
-)
+      (bbox-ray-intersect this r)))
+
+  Transformable
+  (transform-object [this T]
+    (bbox (transform-point (.minp this) T) (transform-point (.maxp this) T))))
 
 (deftype Plane [position normal]
   RayIntersection
@@ -115,6 +124,11 @@
       (if (> (numeric/abs rdotn) eps-small)
         (let [t (/ (vdot3 (vsub3 position (.origin r)) normal) rdotn)]
           (if (> (.maxt r) t (.mint r)) t)))))
+
+  Bounded
+  (bounding-box [this]
+    ;; Bounding-box for an infinite plane...
+    (bbox))
   Object 
   (toString [this] (str position " " normal)))
 
@@ -134,7 +148,11 @@
             (if (< t0 (.mint _r))
               (if (> (.maxt _r) t1) t1)
               t0))))))
-                 
+
+  Bounded
+  (bounding-box [this]
+    (bbox (point3 (- radius) (- radius) (- radius))
+          (point3 radius radius radius)))
   Object
   (toString [this] (str radius)))
 
@@ -160,16 +178,14 @@
           ;; We've computed the barycentric coordinates u,v but we don't
           ;; currently use them - just return t.
           (tuv 0)))))
+
+  Bounded
+  (bounding-box [this]
+    (bbox-union (bbox p0 p1) p2))
+  
   Object
-  (toString [this] (str "<" p0 " " p1 " " p2 ">")))
+  (toString [this] (str p0 " " p1 " " p2)))
 
 (defn triangle [p0 p1 p2]
   (Triangle. p0 p1 p2))
 
-(deftype Primitive [shape transform]
-  RayIntersection
-  (intersect [this _r]
-    (let [^Ray r _r]
-      0.0))
-  Object
-  (toString [this] (str shape " " transform)))
