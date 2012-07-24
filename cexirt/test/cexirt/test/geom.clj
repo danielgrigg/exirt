@@ -1,5 +1,6 @@
 (ns cexirt.test.geom
   (:use [cexirt.geom])
+  (:use [cexirt.transform])
   (:use [clojure.test])
   (:use [cexirt.limath]))
 

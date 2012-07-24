@@ -9,7 +9,6 @@
 
 (import cexirt.transform.Transform)
 
-;
 (defprotocol Transformable
   (transform-object [this T] "Transform the object by T"))
 
@@ -40,6 +39,12 @@
 (defn ray-at [^Ray r ^double t]
   (vadd4 (.origin r) (vmul4s (.direction r) t)))
 
+(defn ray-interval "Confine the ray r to an interval"
+  ([^Ray r ^double mint ^double maxt]
+     (Ray. (.origin r) (.direction r) mint maxt))
+  ([^Ray r ^double maxt]
+     (Ray. (.origin r) (.direction r) (.mint r) maxt)))
+
 (defn ^Ray ray
   ([origin direction]
      (Ray. origin direction eps infinity))
@@ -50,8 +55,7 @@
     
 ;; "Ray to shape intersection methods"
 (defprotocol RayIntersection
-  ( intersect [this r]);; "Distance to intersection")
-  )
+  ( intersect [this r] "Distance to intersection"))
 
 (deftype BBox [minp maxp]
   Bounding
@@ -83,7 +87,7 @@
 (defn bbox-union [^BBox b p]
   (BBox. (vmin4 (.minp b) p) (vmax4 (.maxp b) p)))
 
-(defn bbox-ray-intersect [^BBox B ^Ray r]
+(defn intersect-bbox-ray [^BBox B ^Ray r]
   (let [ea (vsub3 (.minp B) (.origin r))
         slab-intersect (fn [^long i ^double t-min ^double t-max]
                          (let [f ((.direction r) i)
@@ -110,7 +114,7 @@
   RayIntersection
   (intersect [this _r]
     (let [^Ray r _r]
-      (bbox-ray-intersect this r)))
+      (intersect-bbox-ray this r)))
 
   Transformable
   (transform-object [this T]
@@ -133,56 +137,47 @@
   (toString [this] (str position " " normal)))
 
 (defn plane [position normal] (Plane. position normal))
-  
+
+(defn intersect-sphere-ray [^double radius ^Ray r]
+  (let [A (vdot3 (.direction r) (.direction r))
+        B (* 2.0 (vdot3 (.direction r) (.origin r)))
+        C (- (vdot3 (.origin r) (.origin r)) (* radius radius ))]
+    (if-let [t (quadratic A B C)]
+      (let [t0 (first t)
+            t1 (second t)]
+        (if-not (or (> t0 (.maxt r)) (< t1 (.mint r)))
+          (if (< t0 (.mint r))
+            (if (> (.maxt r) t1) t1)
+            t0))))))
+
 (deftype Sphere [^double radius]
   RayIntersection
   (intersect [this r]
-    (let [^Ray _r r
-          A (vdot3 (.direction _r) (.direction _r))
-          B (* 2.0 (vdot3 (.direction _r) (.origin _r)))
-          C (- (vdot3 (.origin _r) (.origin _r)) (sq (.radius this) ))]
-      (if-let [t (quadratic A B C)]
-        (let [t0 (first t)
-              t1 (second t)]
-          (if-not (or (> t0 (.maxt _r)) (< t1 (.mint _r)))
-            (if (< t0 (.mint _r))
-              (if (> (.maxt _r) t1) t1)
-              t0))))))
-
-  Bounded
-  (bounding-box [this]
-    (bbox (point3 (- radius) (- radius) (- radius))
-          (point3 radius radius radius)))
+    (intersect-sphere-ray radius))
   Object
   (toString [this] (str radius)))
 
 (defn sphere [^double r] (Sphere. r))
 
+(defn intersect-triangle-ray [p0 p1 p2 ^Ray r]
+  (let [e1 (vsub3 p1 p0)
+        e2 (vsub3 p2 p0)
+        pvec (cross (.direction r) e2)
+        tvec (vsub3 (.origin r) p0)
+        qvec (cross tvec e1)
+        det (vdot3 e1 pvec)
+        u (vdot3 tvec pvec)
+        v (vdot3 (.direction r) qvec)]
+    (if (and (> det eps)
+             (>= u 0.0) (<= u det)
+             (>= v 0.0) (<= (+ u v) det))
+      (vdiv3s [(vdot3 e2 qvec) u v] det))))
+
 (deftype Triangle [p0 p1 p2]
   RayIntersection
   (intersect [this r]
-    (let [^Ray _r r
-          e1 (vsub3 p1 p0)
-          e2 (vsub3 p2 p0)
-          pvec (cross (.direction _r) e2)
-          tvec (vsub3 (.origin _r) p0)
-          qvec (cross tvec e1)
-          det (vdot3 e1 pvec)
-          u (vdot3 tvec pvec)
-          v (vdot3 (.direction _r) qvec)]
-;      [e1 e2 pvec tvec qvec det u v]))
-      (if (and (> det eps)
-               (>= u 0.0) (<= u det)
-               (>= v 0.0) (<= (+ u v) det))
-        (let [tuv (vdiv3s [(vdot3 e2 qvec) u v] det)]
-          ;; We've computed the barycentric coordinates u,v but we don't
-          ;; currently use them - just return t.
-          (tuv 0)))))
-
-  Bounded
-  (bounding-box [this]
-    (bbox-union (bbox p0 p1) p2))
-  
+    (let [^Ray _r r]
+      ((intersect-triangle-ray p0 p1 p2 _r)) 0))
   Object
   (toString [this] (str p0 " " p1 " " p2)))
 

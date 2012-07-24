@@ -20,36 +20,50 @@
 ;(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-(def world (atom (bbox (point3 -1 -1 -1) (point3 1 1 1))))
-;(def world-transform (atom (translate 0 0 -6)))
-(def world-transform (atom (compose (translate 0 0 -5)
-                                    (rotate-axis 1.0 (vector3 1 1 0)))))
+;;(def world-transform (atom (compose (translate 0 0 -5) (rotate-axis 1.0 (vector3 1 1 0)))))
+(def world-transform (atom (compose (translate 0.0 0.2 -15)
+                                    (rotate-axis (Math/toRadians -35.0)
+                                                 (vector3 -1 1 0)))))
+(def world1 (atom
+            (primitive-list
+             (translate -1 -1 0)
+             [(primitive (compose (rotate-x (Math/toRadians 130)) (scale 1 1 2.5))
+                         (sphere-shape 2.0))
+              (primitive (compose (translate 0 -2 -1) (rotate-x (Math/toRadians 90)) (scale 2.5 1 2.5))
+                         (sphere-shape 2.0))])))
 
+(def world2 (atom
+            (primitive-list
+             (translate 0 0 0)
+             [              
+              (primitive (translate 0 0 -2) (sphere-shape 2.0))
+              (primitive (compose (translate 0 0 -0.8)
+                                  (scale (rand 2.0) (rand 2.0) (rand 2.0)))
+                         (sphere-shape 1.0))
+              ])))
+(def world3 (atom (primitive
+                   (compose 
+                    (rotate-x (Math/toRadians 130))
+                    (scale 1 1 2.5))                    
+                   (sphere-shape 2.0))))
+(defn scale-rand []
+  (scale (+ 0.4 (rand 1.2)) (+ 0.4 (rand 1.2)) 1.0))
+
+(def world4 (atom
+             (primitive-list
+              (translate -4.9 -3 -3)
+              (for [z (range 0 7 3)
+                    y (range 0 7 3)
+                    x (range 0 10 3.3)]
+                (primitive (compose (translate x y z)
+                                    (rotate-axis (rand 3.14)
+                                                 (vnormalize4 (vector3 (rand) (rand) (rand))))
+                                    (scale-rand))
+                           (sphere-shape 1.0))))))
+                
+(def world world4)
 
 (def ^:const default-perspective (perspective (Math/toRadians 38.) 1.0 1.0 100.))
-
-(defn shade-diffuse [p]
-  (let [l (max 0.0 
-               (vdot4 (vnormalize4 (vsub4 p (point3 0 0 0))) 
-                      (vector3 1 1 1)))]
-    [l l l]))
-
-(defn shade-normal [p]
-  (let [rgb (xyz (vadd4s (vmul4s (vnormalize4 (vsub4 p (point3 0 0 0))) 0.5) 0.5))]
-    [(Math/pow (rgb 0) 2.22)
-     (Math/pow (rgb 1) 2.22)
-     (Math/pow (rgb 2) 2.22)]))
-
-(defn shade-distance [t]
-  (vec (repeat 3 (/ t 10.0))))
-
-(defn shade-checker [p]
-  (let [w 1.5
-        fx (if (>= (mod (p 0) (* w 2.0)) w) 1 0)
-        fz (if (>= (mod (p 2) (* w 2.0)) w) 1 0)]
-    (if (= 1 (bit-xor fx fz))
-      [1.0 1.0 1.0]
-      [0.0 0.0 0.0])))
 
 (defn voxel-evaluator [screen-w screen-h proj-t]
   (let [S (screen-transform screen-w screen-h)
@@ -64,7 +78,6 @@
                   [m m m ])
                 [0. 0. 0. ])]
         (sample-radiance sample L)))))
-
         
 (defn trace-evaluator [screen-w screen-h proj-t]
   (let [S (screen-transform screen-w screen-h)
@@ -72,11 +85,7 @@
     (fn [^Sample sample]
       (let [^Ray r-camera (camera-ray (.x-film sample) (.y-film sample) SP)
             ^Ray r-world (transform-object r-camera (inverse @world-transform))
-            L (if-let [hit (intersect @world r-world)]
-                (shade-normal (ray-at r-world hit))
-                                        ;[1.0 1.0 1.0]
-                ;(shade-checker (ray-at r-world hit))
-                [0. 0. 0. ])]
+            L (radiance r-world world)] 
         (sample-radiance sample L)))))
 
 (defn plot-evaluator [width height func]
@@ -110,7 +119,7 @@
           (println "rendering " frame-path)
   ;;        (swap! world-transform frame-transform t)
           (framebuffer-finish
-           (cexirt.forge/prender film filter sampler v-f 4 16)
+           (cexirt.forge/prender film filter sampler f 4 16)
            frame-path))
         nil)))
 

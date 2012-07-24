@@ -179,6 +179,9 @@
 (defn mvmul4 "transform 4-vector v by M" [M v]
   [(vdot4 (M 0) v) (vdot4 (M 1) v) (vdot4 (M 2) v) (vdot4 (M 3) v)])
 
+(defn mvmul34 "transform 4-vector ignoring bottom row" [M v]
+  [(vdot4 (M 0) v) (vdot4 (M 1) v) (vdot4 (M 2) v) (v 3)])
+
 (defn mrow [M r] (M r))
 (defn mcol2 [M c] [((M 0) c) ((M 1) c)])
 (defn mcol3 [M c] [((M 0) c) ((M 1) c) ((M 2) c)])

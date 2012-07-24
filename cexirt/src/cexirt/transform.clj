@@ -142,4 +142,4 @@
 
 (defn transform-point [p ^Transform T ] (mvmul4 (.transform T) p))
 (defn transform-vector [v ^Transform T] (mvmul4 (.transform T) v))
-(defn transform-normal [n ^Transform T] (mvmul4 (mtranspose4 (.inverse T)) n))
+(defn transform-normal [n ^Transform T] (mvmul34 (mtranspose4 (.inverse T)) n))

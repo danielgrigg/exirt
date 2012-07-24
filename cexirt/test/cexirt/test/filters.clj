@@ -1,4 +1,4 @@
-(ns cexirt.test.filter
+(ns cexirt.test.filters
   (:use [cexirt.filters])
   (:use [clojure.test])
   (:use [cexirt.limath]))
