@@ -66,6 +66,12 @@
   Bounded
   (bounding-box [this]
     this)
+  
+  Transformable
+  (transform-object [this T]
+    (let [p0 (transform-point minp T)
+          p1 (transform-point maxp T)]
+      (BBox. (vmin4 p0 p1) (vmax4 p0 p1))))
     
   Object
   (toString [this]
@@ -73,21 +79,28 @@
 
 (defn bbox "Construct a BBox"
   ([] 
-     (BBox. (point3 (- infinity) (- infinity) (- infinity))
-            (point3 infinity infinity infinity)))
-  
+     (BBox. (point3 0 0 0) (point3 0 0 0)))  
  ([[x0 y0 z0 w0 :as p0] [x1 y1 z1 w1 :as p1]]
      (BBox. (vmin4 p0 p1) (vmax4 p0 p1))))
 
 (defn bbox-centre [^BBox b]
   (vmul4 (vadd4 (.minp b) (.maxp b)) [0.5 0.5 0.5 1.] ))
 
-(defn bbox-size [^BBox b] (vector3 (.width b) (.height b) (.depth b)))
+(defn bbox-size "BBox [width height depth]" [^BBox b] (vector3 (.width b) (.height b) (.depth b)))
 
-(defn bbox-union [^BBox b p]
+(defn bbox-union-point "Union of BBox b and point p" [^BBox b p]
   (BBox. (vmin4 (.minp b) p) (vmax4 (.maxp b) p)))
 
-(defn intersect-bbox-ray [^BBox B ^Ray r]
+(defn bbox-union-bbox "Union of bboxes a and b." [^BBox a ^BBox b]
+  (bbox-union-point (bbox-union-point a (.minp b))
+                    (.maxp b)))
+(defn bbox-contains-point "BBox contains point p" [^BBox a p]
+  (let [[x0 y0 z0] (.minp a)
+        [x1 y1 z1] (.maxp a)]
+    (not (or (< (p 0) x0) (< (p 1) y0) (< (p 2) z0)
+             (> (p 0) x1) (> (p 1) y1) (> (p 2) z1)))))
+
+(defn intersect-bbox-ray "Intersection distance of r to B." [^BBox B ^Ray r]
   (let [ea (vsub3 (.minp B) (.origin r))
         slab-intersect (fn [^long i ^double t-min ^double t-max]
                          (let [f ((.direction r) i)
@@ -114,11 +127,7 @@
   RayIntersection
   (intersect [this _r]
     (let [^Ray r _r]
-      (intersect-bbox-ray this r)))
-
-  Transformable
-  (transform-object [this T]
-    (bbox (transform-point (.minp this) T) (transform-point (.maxp this) T))))
+      (intersect-bbox-ray this r))))
 
 (deftype Plane [position normal]
   RayIntersection
@@ -138,7 +147,7 @@
 
 (defn plane [position normal] (Plane. position normal))
 
-(defn intersect-sphere-ray [^double radius ^Ray r]
+(defn intersect-osphere-ray [^double radius ^Ray r]
   (let [A (vdot3 (.direction r) (.direction r))
         B (* 2.0 (vdot3 (.direction r) (.origin r)))
         C (- (vdot3 (.origin r) (.origin r)) (* radius radius ))]
@@ -150,14 +159,31 @@
             (if (> (.maxt r) t1) t1)
             t0))))))
 
-(deftype Sphere [^double radius]
+(deftype OSphere [^double radius]
   RayIntersection
   (intersect [this r]
-    (intersect-sphere-ray radius))
+    (intersect-osphere-ray radius))
   Object
   (toString [this] (str radius)))
 
-(defn sphere [^double r] (Sphere. r))
+(defn osphere [^double r] (OSphere. r))
+
+;; multiple dispatch would be so elegant..
+
+(defn intersect-bbox-sphere [^BBox b ^double radius [sx sy sz] ]
+  (let [[x0 y0 z0] (.minp b)
+        [x1 y1 z1] (.maxp b)]
+         (not (> (+ (if (< sx x0) (sq (- sx x0)) (if (> sx x1) (sq (- sx x1)) 0))
+                    (if (< sy y0) (sq (- sy y0)) (if (> sy y1) (sq (- sy y1)) 0))
+                    (if (< sz z0) (sq (- sz z0)) (if (> sz z1) (sq (- sz z1)) 0)))
+                (sq radius)))))
+
+(defn intersect-bbox-bbox [^BBox a ^BBox b]
+  (let [a0 (.minp a) a1 (.maxp a)
+        b0 (.minp b) b1 (.maxp b)]
+    (not (or (> (a0 0) (b1 0)) (> (b0 0) (a1 0))
+             (> (a0 1) (b1 1)) (> (b0 1) (a1 1))
+             (> (a0 2) (b1 2)) (> (b0 2) (a1 2))))))
 
 (defn intersect-triangle-ray [p0 p1 p2 ^Ray r]
   (let [e1 (vsub3 p1 p0)

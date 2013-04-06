@@ -4,13 +4,13 @@
   (:use cexirt.transform))
 
 ;; This is all pretty ad-hoc and subject to radical change..
-(defn shade-diffuse [[t position normal]]
+(defn shade-diffuse [[t [position normal]]]
   (let [l (max 0.0 
                (vdot4 (vnormalize4 normal)
                       (vnormalize4 (vector3 0.1 0.4 1))))]
     [l l l]))
 
-(defn shade-normal [[t P N]]
+(defn shade-normal [[t [P N]]]
   (let [rgb (xyz (vadd4s (vmul4s (vnormalize4 N) 0.5) 0.5))]
     [(Math/pow (rgb 0) 2.22)
      (Math/pow (rgb 1) 2.22)

@@ -140,6 +140,9 @@
 (defn normal "Construct a normal vector" [^double x ^double y ^double z]
   [x y z 0.0])
 
-(defn transform-point [p ^Transform T ] (mvmul4 (.transform T) p))
-(defn transform-vector [v ^Transform T] (mvmul4 (.transform T) v))
-(defn transform-normal [n ^Transform T] (mvmul34 (mtranspose4 (.inverse T)) n))
+(defn transform-point "Transform a point"
+  [p ^Transform T ] (mvmul4 (.transform T) p))
+(defn transform-vector "Transform a vector"
+  [v ^Transform T] (mvmul4 (.transform T) v))
+(defn transform-normal "Transform a surface normal"
+  [n ^Transform T] (mvmul34 (mtranspose4 (.inverse T)) n))

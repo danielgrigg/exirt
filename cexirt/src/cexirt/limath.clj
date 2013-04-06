@@ -11,7 +11,8 @@
 (def ^:const eps-small 1.4E-45)
 (def ^:const infinity 1e37)
 
-(defn sq [^double x] (* x x))
+(defmacro sq [x]
+  `(* ~x ~x))
 
 (defn equal-scalar
   ([^double x ^double y]

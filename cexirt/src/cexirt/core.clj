@@ -20,50 +20,66 @@
 ;(set! *warn-on-reflection* true)
 (set! *unchecked-math* true)
 
-;;(def world-transform (atom (compose (translate 0 0 -5) (rotate-axis 1.0 (vector3 1 1 0)))))
-(def world-transform (atom (compose (translate 0.0 0.2 -15)
-                                    (rotate-axis (Math/toRadians -35.0)
-                                                 (vector3 -1 1 0)))))
 (def world1 (atom
-            (primitive-list
-             (translate -1 -1 0)
-             [(primitive (compose (rotate-x (Math/toRadians 130)) (scale 1 1 2.5))
-                         (sphere-shape 2.0))
-              (primitive (compose (translate 0 -2 -1) (rotate-x (Math/toRadians 90)) (scale 2.5 1 2.5))
-                         (sphere-shape 2.0))])))
-
+             (primitive (translate -1 -1 0)
+                        (primitive-list
+                         [(primitive (compose (rotate-x (Math/toRadians 130))
+                                              (scale 1 1 2.5))
+                                     (sphere-shape 2.0))
+                          (primitive (compose (translate 0 -2 -1)
+                                              (rotate-x (Math/toRadians 90))
+                                              (scale 2.5 1 2.5))
+                                     (sphere-shape 2.0))]))))
+  
 (def world2 (atom
-            (primitive-list
-             (translate 0 0 0)
-             [              
-              (primitive (translate 0 0 -2) (sphere-shape 2.0))
-              (primitive (compose (translate 0 0 -0.8)
-                                  (scale (rand 2.0) (rand 2.0) (rand 2.0)))
-                         (sphere-shape 1.0))
-              ])))
+             (primitive (translate 0 0 0)
+                        (primitive-list
+                         [              
+                          (primitive (translate 0 0 -2) (sphere-shape 2.0))
+                          (primitive (compose (translate 0 0 -0.8)
+                                              (scale (rand 2.0) (rand 2.0) (rand 2.0)))
+                                     (sphere-shape 1.0))
+                          ]))))
 (def world3 (atom (primitive
                    (compose 
                     (rotate-x (Math/toRadians 130))
                     (scale 1 1 2.5))                    
                    (sphere-shape 2.0))))
+
 (defn scale-rand []
   (scale (+ 0.4 (rand 1.2)) (+ 0.4 (rand 1.2)) 1.0))
 
 (def world4 (atom
-             (primitive-list
+             (primitive 
               (translate -4.9 -3 -3)
-              (for [z (range 0 7 3)
-                    y (range 0 7 3)
-                    x (range 0 10 3.3)]
-                (primitive (compose (translate x y z)
-                                    (rotate-axis (rand 3.14)
-                                                 (vnormalize4 (vector3 (rand) (rand) (rand))))
-                                    (scale-rand))
-                           (sphere-shape 1.0))))))
-                
-(def world world4)
+              (primitive-list
+               (for [z (range 0 7 3)
+                     y (range 0 7 3)
+                     x (range 0 10 3.3)]
+                 (primitive (compose (translate x y z)
+                                     (rotate-axis (rand 3.14)
+                                                  (vnormalize4 (vector3 (rand) (rand) (rand))))
+                                     (scale-rand))
+                            (sphere-shape 1.0)))))))
 
-(def ^:const default-perspective (perspective (Math/toRadians 38.) 1.0 1.0 100.))
+(defn complex-world [n]
+  (let [t (/ (* 10 (dec n)) -2)
+        f (fn [v] (+ v (* (rand) 6.0)))]
+    (primitive (translate t t t)
+               (primitive-grid2
+                (for [z (range 0 (* 10 n) 10)
+                        y (range 0 (* 10 n) 10)
+                        x (range 0 (* 10 n) 10)]
+                  (primitive (translate (f x) (f y) (f z))
+                             (sphere-shape (+ 1.0 (rand)))))))))
+
+
+(def world5 (atom (complex-world 100)))
+
+(def world world5)
+(def world-transform (atom (compose (translate 0.0 0.0 0)
+                                    (rotate-axis (Math/toRadians 0.0)
+                                                 (vector3 1 1 0)))))
 
 (defn voxel-evaluator [screen-w screen-h proj-t]
   (let [S (screen-transform screen-w screen-h)

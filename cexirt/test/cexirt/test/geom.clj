@@ -60,3 +60,18 @@
                   [13.75698 6.66946 15.92125 17.11615]]))))
 
 
+(deftest test-bbox-contains-point
+         (is (= true
+                (let [b (bbox (point3 -2 -2 -2) (point3 2 2 2))]
+                  (and
+                    (bbox-contains-point b (point3 0 0 0))
+                    (bbox-contains-point b (point3 -1 -1 -1))
+                    (bbox-contains-point b (point3 2 2 2))
+                    (not (bbox-contains-point b (point3 2.1 2 2)))
+                    (not (bbox-contains-point b (point3 2 2.1 2)))
+                    (not (bbox-contains-point b (point3 -2 -2 -2.1)))
+                    (not (bbox-contains-point b (point3 -2.1 -2 -2)))
+                    (not (bbox-contains-point b (point3 -2 -2.1 -2))))))))
+                         
+                    
+

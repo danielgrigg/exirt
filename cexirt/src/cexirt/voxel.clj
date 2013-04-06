@@ -36,7 +36,8 @@
 
 ; could certainly be better optimised...but let's stick with 'simplicity' for now.
 (defn voxel-seq3 [grid-bounds [nx ny nz :as ndiv] r]
-  (when-let [enter-t (intersect grid-bounds r)]
+  (when-let [enter-t (if (bbox-contains-point grid-bounds (.origin r)) 0.0
+                         (intersect grid-bounds r))]
     (let [o (ray-at r enter-t)
           d' (.direction r)
           d (vec (map zero-min d'))

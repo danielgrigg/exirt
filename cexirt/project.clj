@@ -1,4 +1,4 @@
-(defproject cexirt "1.0.0-SNAPSHOT"
+(defproject cexirt "0.0.1"
   :description "cexirt project"
   :main cexirt.core
   :dependencies [[org.clojure/clojure "1.3.0"]
