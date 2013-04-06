@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Installs all JAR from lib to a local maven repository
+
+REPO=maven-repo
+
+[[ -d jar ]] || { echo "No local jars...OK"; exit 0; }
+[[ -d $REPO ]] || mkdir $REPO
+
+for j in $(ls jar/*.jar); do
+  JBASE=$(basename $j)
+  JNAME=${JBASE%%.jar}
+
+  echo "Installing $j as $JNAME..."
+
+  #TODO -versioning if the JAR has it
+  mvn install:install-file -Dfile=$j -DartifactId=$JNAME -Dversion=1.0.0 -DgroupId=local -Dpackaging=jar -DlocalRepositoryPath=$REPO -DcreateChecksum=true
+done
+
