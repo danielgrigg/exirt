@@ -4,10 +4,10 @@
 
 REPO=maven-repo
 
-[[ -d jar ]] || { echo "No local jars...OK"; exit 0; }
+[[ -d jars ]] || { echo "No local jars...OK"; exit 0; }
 [[ -d $REPO ]] || mkdir $REPO
 
-for j in $(ls jar/*.jar); do
+for j in $(ls jars/*.jar); do
   JBASE=$(basename $j)
   JNAME=${JBASE%%.jar}
 
